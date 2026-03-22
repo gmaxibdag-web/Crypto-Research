@@ -20,6 +20,7 @@ import arxiv
 from datetime import datetime
 from pathlib import Path
 from groq import Groq
+from tavily import TavilyClient
 from dotenv import load_dotenv
 
 # ── Config ────────────────────────────────────────────────────────────────────
@@ -27,11 +28,12 @@ BASE_DIR = Path(__file__).parent.parent
 load_dotenv(BASE_DIR / ".env")
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 RESEARCH_DIR = BASE_DIR / "research"
 FINDINGS_FILE = RESEARCH_DIR / "findings.json"
 RESEARCH_DIR.mkdir(exist_ok=True)
 
-# Groq model — Deepseek R1 for reasoning, fallback to Llama 3.3 70B
+# Groq models
 GROQ_MODEL_PRIMARY = "llama-3.3-70b-versatile"   # Groq free tier — fast, strong
 GROQ_MODEL_FALLBACK = "llama-3.1-8b-instant"      # smaller fallback if rate limited
 
@@ -100,6 +102,51 @@ def search_semantic_scholar(topic: str, max_results: int = 8) -> list[dict]:
         return papers
     except Exception as e:
         log(f"  ✗ Semantic Scholar error: {e}")
+        return []
+
+
+def search_web_tavily(topic: str, max_results: int = 6) -> list[dict]:
+    """Search the live web via Tavily for recent crypto research & analysis."""
+    if not TAVILY_API_KEY:
+        log("  ⚠ Tavily key not set, skipping web search")
+        return []
+    log(f"🌐 Tavily web search: '{topic}'")
+    try:
+        client = TavilyClient(api_key=TAVILY_API_KEY)
+        result = client.search(
+            query=topic + " crypto trading strategy 2024 2025",
+            search_depth="advanced",
+            max_results=max_results,
+            include_answer=True,
+        )
+        web_results = []
+        for r in result.get("results", []):
+            content = (r.get("content") or "")[:600]
+            if not content:
+                continue
+            web_results.append({
+                "title": r.get("title", ""),
+                "abstract": content,
+                "authors": [],
+                "published": "2024-2025",
+                "url": r.get("url", ""),
+                "source": "web_tavily",
+            })
+        # Also include Tavily's synthesized answer as a source
+        answer = result.get("answer", "")
+        if answer:
+            web_results.insert(0, {
+                "title": f"Web synthesis: {topic}",
+                "abstract": answer[:600],
+                "authors": [],
+                "published": "2025",
+                "url": "",
+                "source": "tavily_answer",
+            })
+        log(f"  ✓ Found {len(web_results)} web results")
+        return web_results
+    except Exception as e:
+        log(f"  ✗ Tavily error: {e}")
         return []
 
 
@@ -250,13 +297,15 @@ def print_finding(finding: dict):
 def run_research(topic: str) -> dict:
     log(f"🚀 Starting research: '{topic}'")
     
-    # Search both sources in parallel conceptually (sequential for simplicity)
+    # Search all sources
     arxiv_papers = search_arxiv(topic)
-    time.sleep(1)  # Be polite to APIs
+    time.sleep(1)
     ss_papers = search_semantic_scholar(topic)
+    time.sleep(1)
+    web_results = search_web_tavily(topic)
     
-    all_papers = arxiv_papers + ss_papers
-    log(f"📚 Total papers found: {len(all_papers)}")
+    all_papers = arxiv_papers + ss_papers + web_results
+    log(f"📚 Total sources found: {len(all_papers)} (arXiv: {len(arxiv_papers)}, S2: {len(ss_papers)}, web: {len(web_results)})")
     
     if not all_papers:
         log("⚠️  No papers found — synthesizing from general knowledge only")

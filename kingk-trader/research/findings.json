@@ -70,5 +70,41 @@
     "model_used": "llama-3.3-70b-versatile",
     "papers_found": 8,
     "researched_at": "2026-03-22T23:41:31.154810"
+  },
+  {
+    "topic": "EMA crossover trend following crypto momentum edge",
+    "summary": "Research suggests that EMA crossover strategies can be effective in identifying trends and generating trading signals in cryptocurrency markets, with some studies showing significant returns and risk-adjusted performance. The EMA crossover strategy involves buying when a short-term EMA crosses above a long-term EMA and selling when it crosses below. This approach can be used to capture momentum and follow trends in crypto markets.",
+    "edge_exists": true,
+    "confidence": "medium",
+    "key_findings": [
+      "The EMA crossover strategy can be used to identify trends and generate trading signals in cryptocurrency markets",
+      "Short-term EMAs (e.g. 12-day) crossing above long-term EMAs (e.g. 50-day) can be a bullish signal, while crosses below can be bearish",
+      "The optimal timeframe for EMA crossover strategies in crypto markets is not universally agreed upon, but common timeframes include 4h, 1d, and 1w"
+    ],
+    "signal_parameters": {
+      "primary_indicator": "EMA crossover",
+      "optimal_timeframe": "1d",
+      "entry_conditions": [
+        "short EMA crosses above long EMA",
+        "short EMA crosses below long EMA"
+      ],
+      "confirmation_signals": [
+        "RSI",
+        "MACD"
+      ],
+      "risk_notes": "high volatility and potential for whipsaws in trending markets"
+    },
+    "implementation_notes": "Implement the EMA crossover strategy using a paper trader or backtesting platform, with careful consideration of position sizing, risk management, and market conditions",
+    "backtesting_suggestions": "Test the EMA crossover strategy using historical data, varying the timeframe, EMA periods, and other parameters to optimize performance and robustness",
+    "papers_cited": [
+      "Cryptocurrency Trading: A Comprehensive Survey",
+      "A Decade of Evidence of Trend Following Investing in Cryptocurrencies",
+      "Rise of the Machines? Intraday High-Frequency Trading Patterns of Cryptocurrencies",
+      "Multi-EMA Crossover Trend Following Quantitative Trading Strategy",
+      "How to trade EMA 12 / 50 crossovers? Crypto strategy - altFINS"
+    ],
+    "model_used": "llama-3.3-70b-versatile",
+    "papers_found": 15,
+    "researched_at": "2026-03-22T23:56:24.801725"
   }
 ]
