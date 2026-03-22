@@ -1,0 +1,74 @@
+[
+  {
+    "topic": "RSI divergence volume breakout crypto momentum",
+    "summary": "The research suggests that RSI divergence can be a useful indicator for identifying potential breakouts in cryptocurrency markets, particularly when combined with volume analysis. However, the effectiveness of this strategy can be influenced by various market and trading factors. The studies provide insights into the behavior of cryptocurrencies and the importance of considering multiple factors when developing a trading strategy.",
+    "edge_exists": true,
+    "confidence": "medium",
+    "key_findings": [
+      "RSI divergence can be a predictive signal for breakouts in cryptocurrency markets",
+      "Volume analysis can help confirm the strength of a potential breakout",
+      "Combining RSI divergence with other indicators, such as liquidity measures, can improve the accuracy of trading signals"
+    ],
+    "signal_parameters": {
+      "primary_indicator": "RSI",
+      "optimal_timeframe": "4h",
+      "entry_conditions": [
+        "RSI divergence",
+        "increasing volume"
+      ],
+      "confirmation_signals": [
+        "breakout above resistance",
+        "liquidity jump"
+      ],
+      "risk_notes": "high volatility and potential for false breakouts"
+    },
+    "implementation_notes": "Implementing this strategy in a paper trader would require setting up a trading bot to monitor RSI divergence and volume analysis, and executing trades based on the defined entry and confirmation conditions.",
+    "backtesting_suggestions": "Backtest the strategy using historical data, varying the timeframe and parameters to optimize performance, and considering different risk management techniques to mitigate potential losses.",
+    "papers_cited": [
+      "Cryptocurrency Trading: A Comprehensive Survey",
+      "Exploring the Interconnectedness of Cryptocurrencies using Correlation Networks",
+      "Rise of the Machines? Intraday High-Frequency Trading Patterns of Cryptocurrencies",
+      "Liquidity Jump, Liquidity Diffusion, and Crypto Wash Trading",
+      "Dynamic Grid Trading Strategy: From Zero Expectation to Market Outperformance"
+    ],
+    "model_used": "llama-3.3-70b-versatile",
+    "papers_found": 8,
+    "researched_at": "2026-03-22T23:41:14.545854"
+  },
+  {
+    "topic": "SUI on-chain momentum trading signals altcoin",
+    "summary": "Research suggests that on-chain momentum trading signals can be used to predict price movements in altcoins, including SUI. The use of machine learning algorithms and dynamic grid trading strategies can improve the accuracy of these predictions. However, the effectiveness of these signals depends on various factors, including market conditions and the quality of the data used.",
+    "edge_exists": true,
+    "confidence": "medium",
+    "key_findings": [
+      "On-chain momentum signals, such as transaction volume and network activity, have predictive value for altcoin price movements",
+      "Machine learning algorithms, such as LSTM and Random Forest, can be used to improve the accuracy of these predictions",
+      "Dynamic grid trading strategies can be used to adapt to changing market conditions and improve trading performance"
+    ],
+    "signal_parameters": {
+      "primary_indicator": "On-chain momentum indicator (e.g. transaction volume, network activity)",
+      "optimal_timeframe": "4h",
+      "entry_conditions": [
+        "Bullish on-chain momentum signal",
+        "Price above moving average"
+      ],
+      "confirmation_signals": [
+        "Bullish RSI divergence",
+        "Increasing trading volume"
+      ],
+      "risk_notes": "High market volatility and potential for false signals"
+    },
+    "implementation_notes": "Implement a paper trader using a programming language such as Python, with libraries such as CCXT for data feed and backtesting, and scikit-learn for machine learning algorithms",
+    "backtesting_suggestions": "Backtest the strategy using historical data, with a focus on evaluating the performance of the on-chain momentum indicator and the dynamic grid trading strategy, and adjusting parameters as needed",
+    "papers_cited": [
+      "151 Estrategias de Trading (151 Trading Strategies)",
+      "AI for trading strategies",
+      "Dynamic Grid Trading Strategy: From Zero Expectation to Market Outperformance",
+      "Ensemble properties of high frequency data and intraday trading rules",
+      "Backtest of Trading Systems on Candle Charts"
+    ],
+    "model_used": "llama-3.3-70b-versatile",
+    "papers_found": 8,
+    "researched_at": "2026-03-22T23:41:31.154810"
+  }
+]
