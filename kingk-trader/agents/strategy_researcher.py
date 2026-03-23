@@ -36,7 +36,7 @@ STRATEGIES_DIR.mkdir(exist_ok=True)
 BACKTEST_DIR.mkdir(exist_ok=True)
 
 # Models
-GEMINI_MODEL = "gemini-2.0-flash-lite-preview"  # Latest — fast, cheap — for parameter mutations
+GEMINI_MODEL = "gemini-3.1-flash-lite-preview"  # Latest — fast, cheap — for parameter mutations
 GROQ_MODEL = "llama-3.3-70b-versatile"  # Deep reasoning — for strategy synthesis
 
 # Configure Gemini
