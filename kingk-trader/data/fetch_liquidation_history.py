@@ -248,11 +248,11 @@ def build_liquidation_4h(symbol: str, days: int = 730) -> pd.DataFrame:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fetch/derive liquidation volume proxy for Bybit perps")
-    parser.add_argument("--symbol", "-s", type=str, default=None, help="Symbol (default: XRPUSDT and SUIUSDT)")
+    parser.add_argument("--symbol", "-s", type=str, default=None, help="Symbol (default: all 5 pairs)")
     parser.add_argument("--days",   "-d", type=int, default=730,  help="Days of history (default: 730)")
     args = parser.parse_args()
 
-    symbols = [args.symbol] if args.symbol else ["XRPUSDT", "SUIUSDT"]
+    symbols = [args.symbol] if args.symbol else ["XRPUSDT", "SUIUSDT", "BTCUSDT", "ETHUSDT", "SOLUSDT"]
     for sym in symbols:
         build_liquidation_4h(sym, days=args.days)
         time.sleep(1)

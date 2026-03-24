@@ -90,9 +90,44 @@ def add_ema_cross_indicators(df, cfg):
     return df
 
 def get_signal(symbol: str) -> dict | None:
+    import pandas as pd
     cfg = STRATEGY[symbol]
     module_name = STRATEGY_MODULE.get(symbol, "ema_swing")
     df = get_klines(symbol, interval="240", limit=150)
+
+    # --- Merge funding rate data (for funding_rate_divergence & liquidation_cascade) ---
+    if module_name in ["funding_rate_divergence", "liquidation_cascade"]:
+        funding_path = Path(__file__).parent.parent / "data" / "historical" / f"{symbol}_funding_4h.csv"
+        if funding_path.exists():
+            df_funding = pd.read_csv(funding_path, parse_dates=["datetime"])
+            # Merge on timestamp (backward fill for latest available)
+            df = pd.merge_asof(
+                df.sort_values("timestamp"),
+                df_funding[["timestamp", "funding_rate", "open_interest"]].sort_values("timestamp"),
+                on="timestamp",
+                direction="backward"
+            )
+        else:
+            # Fallback: add zero columns
+            df["funding_rate"] = 0.0
+            df["open_interest"] = 0.0
+
+    # --- Merge liquidation data (for liquidation_cascade) ---
+    if module_name == "liquidation_cascade":
+        liq_path = Path(__file__).parent.parent / "data" / "historical" / f"{symbol}_liquidations_4h.csv"
+        if liq_path.exists():
+            df_liq = pd.read_csv(liq_path, parse_dates=["datetime"])
+            # Merge on timestamp (backward fill)
+            df = pd.merge_asof(
+                df.sort_values("timestamp"),
+                df_liq[["timestamp", "liquidation_volume_usd", "is_cluster"]].sort_values("timestamp"),
+                on="timestamp",
+                direction="backward"
+            )
+        else:
+            # Fallback: add zero columns
+            df["liquidation_volume_usd"] = 0.0
+            df["is_cluster"] = False
 
     # Load the correct strategy module dynamically
     strategy_mod = load_strategy_module(module_name)

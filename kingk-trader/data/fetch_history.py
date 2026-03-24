@@ -65,6 +65,6 @@ def fetch_deep(symbol: str, interval: str = "240", days: int = 730) -> pd.DataFr
     return df
 
 if __name__ == "__main__":
-    for sym in ["XRPUSDT", "SUIUSDT"]:
+    for sym in ["XRPUSDT", "SUIUSDT", "BTCUSDT", "ETHUSDT", "SOLUSDT"]:
         fetch_deep(sym, interval="240", days=730)
         time.sleep(1)

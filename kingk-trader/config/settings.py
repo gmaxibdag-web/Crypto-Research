@@ -9,38 +9,29 @@ TRADING_MODE = "paper"  # "paper" (simulation) or "testnet" (Bybit demo account)
 TESTNET_ENABLED = False  # SAFETY FLAG: must be True to submit real orders to testnet
 AUTO_CONFIRM_TESTNET = False  # Auto-confirm testnet orders (False = require input)
 
-PAIRS = ["XRPUSDT", "SUIUSDT"]
+PAIRS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "SUIUSDT"]
 
-TOTAL_CAPITAL = 1000
+TOTAL_CAPITAL = 5000
 ALLOCATION = {
-    "XRPUSDT": 400,
-    "SUIUSDT": 400,
-    "RESERVE": 200,
+    "BTCUSDT": 1000,
+    "ETHUSDT": 1000,
+    "SOLUSDT": 1000,
+    "XRPUSDT": 1000,
+    "SUIUSDT": 1000,
+    "RESERVE": 0,
 }
 
-# --- TUNED STRATEGY PARAMS (param sweep 2026-03-24, 4h 2yr backtest) ---
-# Winner: RSI Divergence on XRPUSDT (Sharpe=0.47, P&L=+$65.84, 26 trades)
-# EMA Swing remains primary on SUIUSDT (Sharpe=0.21, P&L=+$60.00)
+# --- TUNED STRATEGY PARAMS (2026-03-24 — expanded to 5 pairs) ---
+# Backtest results (2yr 4h, $1000 per pair):
+#   BTCUSDT: Funding Rate Divergence (Sharpe=0.5818, +$43.39)
+#   ETHUSDT: Funding Rate Divergence (Sharpe=0.2367, +$86.13)
+#   SOLUSDT: Liquidation Cascade (Sharpe=0.5680, +$188.11)
+#   XRPUSDT: Funding Rate Divergence (Sharpe=0.5199, +$360.50)
+#   SUIUSDT: Liquidation Cascade (Sharpe=0.8426, +$211.47)
 STRATEGY = {
-    # ── XRPUSDT: Funding Rate Divergence (NEW — beats RSI Divergence on XRP) ──
-    # Signal: negative funding + OI drop = bull capitulation reversal
-    # Sharpe=0.520 | P&L=+$144.23 | 50 trades | WinRate=58.0% | MaxDD=-14.2%
-    # Added 2026-03-24. Prev best: rsi_divergence_breakout (Sharpe=0.473, P&L=+$65.85)
-    "XRPUSDT": {
-        "strategy":          "funding_rate_divergence",  # NEW 2026-03-24
-        "funding_threshold": -0.00005,   # negative funding, calibrated to Bybit perp scale
-        "oi_drop_pct":       0.02,       # >2% OI drop in 4h = deleveraging signal
-        "use_price_filter":  False,      # price filter hurts performance on XRP
-        "use_rsi_filter":    True,       # RSI < 50 guards against overbought entries
-        "tp":                0.06,
-        "sl":                0.03,
-    },
-    # ── SUIUSDT: Funding Rate Divergence (NEW — dominates EMA Swing on SUI) ──
-    # Signal: negative funding + OI drop = bull capitulation reversal
-    # Sharpe=0.696 | P&L=+$132.01 | 34 trades | WinRate=50.0% | MaxDD=-11.8%
-    # Added 2026-03-24. Prev best: ema_swing (Sharpe=0.213, P&L=+$60.00)
-    "SUIUSDT": {
-        "strategy":          "funding_rate_divergence",  # NEW 2026-03-24
+    # ── BTCUSDT: Funding Rate Divergence ──
+    "BTCUSDT": {
+        "strategy":          "funding_rate_divergence",
         "funding_threshold": -0.00005,
         "oi_drop_pct":       0.02,
         "use_price_filter":  False,
@@ -48,9 +39,44 @@ STRATEGY = {
         "tp":                0.06,
         "sl":                0.03,
     },
-    # ── FALLBACK STRATEGIES (kept for reference / rotation) ──
-    # XRPUSDT fallback: rsi_divergence_breakout (Sharpe=0.473, P&L=+$65.85)
-    # SUIUSDT fallback: ema_swing (Sharpe=0.213, P&L=+$60.00)
+    # ── ETHUSDT: Funding Rate Divergence ──
+    "ETHUSDT": {
+        "strategy":          "funding_rate_divergence",
+        "funding_threshold": -0.00005,
+        "oi_drop_pct":       0.02,
+        "use_price_filter":  False,
+        "use_rsi_filter":    True,
+        "tp":                0.06,
+        "sl":                0.03,
+    },
+    # ── SOLUSDT: Liquidation Cascade ──
+    "SOLUSDT": {
+        "strategy":          "liquidation_cascade",
+        "cluster_pct_threshold": 0.90,
+        "funding_threshold": -0.00005,
+        "use_rsi_filter":    False,
+        "tp":                0.06,
+        "sl":                0.03,
+    },
+    # ── XRPUSDT: Funding Rate Divergence ──
+    "XRPUSDT": {
+        "strategy":          "funding_rate_divergence",
+        "funding_threshold": -0.00005,
+        "oi_drop_pct":       0.02,
+        "use_price_filter":  False,
+        "use_rsi_filter":    True,
+        "tp":                0.06,
+        "sl":                0.03,
+    },
+    # ── SUIUSDT: Liquidation Cascade ──
+    "SUIUSDT": {
+        "strategy":          "liquidation_cascade",
+        "cluster_pct_threshold": 0.90,
+        "funding_threshold": -0.00005,
+        "use_rsi_filter":    False,
+        "tp":                0.06,
+        "sl":                0.03,
+    },
 }
 
 # ── LIQUIDATION CASCADE (2026-03-24) ─────────────────────────────────────────
@@ -92,8 +118,17 @@ LIQUIDATION_CASCADE_CONFIG = {
 INTERVAL = "240"   # 4h candles
 
 # --- Per-pair strategy module routing ---
-# Updated 2026-03-24: funding_rate_divergence promoted on both pairs
+# Updated 2026-03-24: expanded to 5 pairs (BTC, ETH, SOL, XRP, SUI)
+# Backtest winner assignment (2yr 4h):
+# BTCUSDT: Funding Rate Divergence (Sharpe=0.5818, +$43.39, 12 trades)
+# ETHUSDT: Funding Rate Divergence (Sharpe=0.2367, +$86.13, 33 trades)
+# SOLUSDT: Liquidation Cascade (Sharpe=0.5680, +$188.11, 28 trades)
+# XRPUSDT: Funding Rate Divergence (Sharpe=0.5199, +$360.50, 50 trades)
+# SUIUSDT: Liquidation Cascade (Sharpe=0.8426, +$211.47, 22 trades)
 STRATEGY_MODULE = {
-    "XRPUSDT": "funding_rate_divergence",  # Sharpe 0.52, +$144 (2026-03-24)
-    "SUIUSDT": "liquidation_cascade",       # Sharpe 0.83, +$97, 6.4% MaxDD — SUPERIOR (2026-03-24)
+    "BTCUSDT": "funding_rate_divergence",
+    "ETHUSDT": "funding_rate_divergence",
+    "SOLUSDT": "liquidation_cascade",
+    "XRPUSDT": "funding_rate_divergence",
+    "SUIUSDT": "liquidation_cascade",
 }
