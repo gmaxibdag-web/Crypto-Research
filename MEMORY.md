@@ -116,8 +116,10 @@ _Curated knowledge. Updated as we go._
 | Bollinger MR | both | — | negative | negative | — | deep |
 
 ### Current Live Config (as of 2026-03-24)
-- **XRPUSDT → rsi_divergence_breakout** (tuned: rsi_oversold=35, vol_mult=1.8, EMA50 ±10% window)
-- **SUIUSDT → ema_swing** (ema_fast=12, ema_slow=26, ema_trend=100, RSI 50-65, vol 1.2x, TP 5%, SL 3%)
+- **XRPUSDT → rsi_divergence_breakout** (rsi_oversold=35, vol_mult=1.8, ema_proximity=0.10) — Sharpe 0.473, +$65
+- **SUIUSDT → ema_swing** (ema_fast=12, ema_slow=26, ema_trend=100, RSI 50-65, vol 1.2x, TP 5%, SL 3%) — Sharpe 0.21, +$60
+- Paper trader routes per-pair via STRATEGY_MODULE in config/settings.py (importlib dynamic load)
+- ⚠️ Tuned params must live as defaults in the strategy module itself — backtest.py doesn't pass extra params to generate_signals()
 
 ### Key Decisions
 - Bollinger MR benched — fundamentally broken in crypto downtrends
