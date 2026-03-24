@@ -79,15 +79,33 @@ _Curated knowledge. Updated as we go._
 
 ---
 
-## 🚧 In Progress (2026-03-24)
+## ✅ Completed (2026-03-24)
 
-- Subagent building multi-strategy pipeline:
-  - `strategies/macd_rsi.py`
-  - `strategies/bollinger_mean_reversion.py`
-  - `strategies/rsi_divergence_breakout.py`
-  - Backtest CLI + JSON output + Sharpe ratio
-  - Fixed strategy_researcher.py integration
-  - Full comparison run across all 4 strategies
+### Multi-Strategy Pipeline
+- `strategies/macd_rsi.py` — built
+- `strategies/bollinger_mean_reversion.py` — built
+- `strategies/rsi_divergence_breakout.py` — built
+- `backtests/backtest.py` — full CLI (--symbol, --interval, --strategy, --tp, --sl, --json-output), Sharpe + MaxDD
+- `backtests/compare_strategies.py` — comparison matrix runner
+- `agents/strategy_researcher.py` — fixed, now calls backtest properly, saves to research/backtests/
+
+### Strategy Comparison Results (4h, 2yr, $400/pair)
+| Symbol | Strategy | Trades | Win% | P&L | Sharpe |
+|--------|----------|--------|------|-----|--------|
+| SUIUSDT | EMA Swing 🏆 | 40 | 37.5% | +$60 | +0.21 |
+| XRPUSDT | EMA Swing | 32 | 34.4% | -$7 | -0.04 |
+| XRPUSDT | MACD+RSI | 193 | 28.0% | -$242 | -0.11 |
+| SUIUSDT | MACD+RSI | 187 | 28.9% | -$210 | -0.08 |
+| XRPUSDT | Bollinger MR | 127 | 37.0% | -$114 | -0.10 |
+| SUIUSDT | Bollinger MR | 132 | 24.2% | -$375 | -0.31 |
+| Both | RSI Divergence | ~0 | — | — | — |
+
+### Findings
+- EMA Swing SUI only positive Sharpe strategy — keep live
+- MACD+RSI overtrades (190+ trades) — needs trend filter (EMA100) to cut noise
+- Bollinger MR bleeds in downtrends — needs trend filter too
+- RSI Divergence too restrictive — RSI<35 + price above EMA50 almost never triggers
+- **Next:** tune MACD+RSI + Bollinger with trend filter, run auto-researcher loops
 
 ---
 
