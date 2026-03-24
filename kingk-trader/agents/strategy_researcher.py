@@ -123,6 +123,16 @@ AVAILABLE_STRATEGIES = {
         },
         "description": "Trade when funding rate diverges from price action",
     },
+    "liquidation_cascade": {
+        "name": "Liquidation Cascade",
+        "parameters": {
+            "cluster_pct_threshold": 0.90,
+            "funding_threshold": -0.00005,
+            "tp": 0.06,
+            "sl": 0.03,
+        },
+        "description": "Liquidation cascade + negative funding = reversal signal (4h XRP baseline Sharpe 0.496)",
+    },
 }
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -717,7 +727,8 @@ def compare_strategies(current_best: dict, candidate: dict) -> bool:
 # ── Main Research Loop ────────────────────────────────────────────────────────
 
 def run_research_loop(strategy_name: str, num_cycles: int = 10,
-                      symbol: str = "XRPUSDT", interval: str = "240"):
+                      symbol: str = "XRPUSDT", interval: str = "240",
+                      free_tier_only: bool = False):
     """Main research loop with smart model fallback chain and quota tracking."""
     if strategy_name not in AVAILABLE_STRATEGIES:
         log(f"❌ Unknown strategy: {strategy_name}. Available: {list(AVAILABLE_STRATEGIES.keys())}")
@@ -727,17 +738,30 @@ def run_research_loop(strategy_name: str, num_cycles: int = 10,
     log(f"🚀 Research loop: {strategy_name} | {num_cycles} cycles | {symbol} {interval}")
     log(f"   Baseline: {baseline_info['description']}")
 
+    # FREE_TIER_ONLY_MODE: env var or CLI flag
+    _free_only = FREE_TIER_ONLY_MODE or free_tier_only
+    if _free_only:
+        log(f"🔒 FREE_TIER_ONLY_MODE enabled — skipping paid tiers")
+
     # Load quota state
     quota_state = load_quota_state()
 
     # Define fallback chain: (model_name, mutator_func)
-    mutation_attempt_order = [
-        ("groq",     mutate_with_groq),
-        ("deepseek", mutate_with_deepseek),
-        ("gemini",   mutate_with_gemini),
-        ("haiku",    mutate_with_haiku),
-        ("random",   random_mutation),
-    ]
+    # FREE_TIER_ONLY_MODE skips DeepSeek and Haiku
+    if _free_only:
+        mutation_attempt_order = [
+            ("groq",   mutate_with_groq),
+            ("gemini", mutate_with_gemini),
+            ("random", random_mutation),
+        ]
+    else:
+        mutation_attempt_order = [
+            ("groq",     mutate_with_groq),
+            ("deepseek", mutate_with_deepseek),
+            ("gemini",   mutate_with_gemini),
+            ("haiku",    mutate_with_haiku),
+            ("random",   random_mutation),
+        ]
 
     # First, backtest the baseline
     log(f"\n📍 BASELINE")
@@ -755,6 +779,11 @@ def run_research_loop(strategy_name: str, num_cycles: int = 10,
     for cycle in range(1, num_cycles + 1):
         log(f"\n📍 GENERATION {cycle}/{num_cycles}")
 
+        # Loop prevention: check if any method is available
+        if not should_continue_loop(cycle, num_cycles, quota_state):
+            log(f"⚠️  Stopping at cycle {cycle}/{num_cycles} — quota exhausted")
+            break
+
         best_params = current_best.get("strategy", {}).get("parameters",
                       baseline_info["parameters"])
         mutation_base = {
@@ -763,42 +792,46 @@ def run_research_loop(strategy_name: str, num_cycles: int = 10,
         }
 
         mutated = None
+        tried_models = []
 
         for model_name, mutator_func in mutation_attempt_order:
             if not should_use_model(model_name, quota_state):
                 log(f"  ⊘ {model_name} quota exhausted, skipping")
                 continue
 
-            # Show quota info
+            # Show quota info per mutation
             m = quota_state["models"].get(model_name, {})
             if model_name == "groq":
                 remaining = m.get("remaining_requests", "?")
-                quota_str = f"{remaining}/5000 requests"
+                quota_str = f"{remaining}/5000"
             elif model_name == "deepseek":
                 remaining = m.get("remaining_requests", "?")
-                quota_str = f"{remaining}/50 requests/min"
+                quota_str = f"{remaining}/50 req/min"
             elif model_name == "gemini":
-                qd = m.get("queries_today", 0)
-                qm = m.get("queries_this_minute", 0)
-                quota_str = f"{qd}/1500 today, {qm}/15 this min"
+                qd  = m.get("queries_today", 0)
+                qdl = m.get("free_tier_limit_queries_per_day", 1500)
+                quota_str = f"{qd}/{qdl} today"
             elif model_name == "haiku":
                 quota_str = "Anthropic (generous)"
             else:
                 quota_str = "unlimited"
 
-            log(f"  → {model_name} ({quota_str})...")
+            fallback_str = " → ".join(tried_models) + (" → " if tried_models else "")
+            log(f"  🧬 Mutation #{cycle} {fallback_str}{model_name} ({quota_str})")
 
             try:
                 mutated = mutator_func(mutation_base, cycle, quota_state)
                 if mutated:
-                    log(f"    ✓ {model_name} success — {mutated.get('rationale', 'mutation applied')}")
+                    log(f"    ✅ {model_name} success — {mutated.get('rationale', 'mutation applied')}")
                     break
             except RateLimitError as e:
-                log(f"    ✗ {model_name} rate limit — marking exhausted")
+                log(f"    ⚠️  {model_name} quota limit hit → falling back")
                 mark_model_quota_exhausted(model_name, quota_state)
+                tried_models.append(model_name)
                 continue
             except Exception as e:
                 log(f"    ✗ {model_name} error: {e}")
+                tried_models.append(model_name)
                 continue
 
         if not mutated:
@@ -888,6 +921,43 @@ def list_generations():
               f"${pnl:>7.2f} | {source:<12} | {bias}")
 
 
+# ── Free-Tier Only Mode ───────────────────────────────────────────────────────
+
+FREE_TIER_ONLY_MODE = os.getenv("FREE_TIER_ONLY", "").lower() in ("true", "1", "yes")
+
+
+def should_continue_loop(cycle: int, max_cycles: int, quota_state: dict) -> bool:
+    """
+    Prevent infinite loops when all tiers exhausted.
+    Random mutation is always available as final fallback, so this only
+    logs state and warns — it never blocks if random is the last resort.
+    """
+    free_only = FREE_TIER_ONLY_MODE
+    groq_ok     = should_use_model("groq", quota_state)
+    gemini_ok   = should_use_model("gemini", quota_state)
+    deepseek_ok = not free_only and should_use_model("deepseek", quota_state)
+    haiku_ok    = not free_only and should_use_model("haiku", quota_state)
+
+    any_ai = groq_ok or gemini_ok or deepseek_ok or haiku_ok
+
+    if not any_ai:
+        # Get gemini quota info for the log message
+        gm = quota_state.get("models", {}).get("gemini", {})
+        gemini_remaining = gm.get("free_tier_limit_queries_per_day", 1500) - gm.get("queries_today", 0)
+
+        groq_rem = quota_state.get("models", {}).get("groq", {}).get("remaining_requests", 0)
+        ds_rem   = quota_state.get("models", {}).get("deepseek", {}).get("remaining_requests", 0)
+
+        log(f"⚠️  All AI model quotas exhausted at cycle {cycle}/{max_cycles}")
+        log(f"   Groq: {groq_rem} remaining | DeepSeek: {ds_rem} remaining | "
+            f"Gemini: {gemini_remaining} remaining")
+        log(f"   Action: Enable FREE_TIER_ONLY_MODE or top up credits")
+        log(f"   Falling back to random mutation (always available)")
+        # We still return True — random mutation is always available as fallback
+        # Return False only if you want to halt on quota exhaustion
+    return True
+
+
 def main():
     parser = argparse.ArgumentParser(description="KingK Strategy Auto-Researcher")
     parser.add_argument("--baseline", "-b", type=str,
@@ -897,8 +967,10 @@ def main():
     parser.add_argument("--cycles",   "-c", type=int, default=10, help="Number of mutation cycles")
     parser.add_argument("--symbol",   "-s", type=str, default="XRPUSDT", help="Symbol e.g. XRPUSDT")
     parser.add_argument("--interval", "-i", type=str, default="240", help="Candle interval: 60, 240")
-    parser.add_argument("--list",     "-l", action="store_true", help="List all generations")
-    parser.add_argument("--quota",    "-q", action="store_true", help="Show current quota state")
+    parser.add_argument("--list",           "-l", action="store_true", help="List all generations")
+    parser.add_argument("--quota",          "-q", action="store_true", help="Show current quota state")
+    parser.add_argument("--free-tier-only", "-f", action="store_true",
+                        help="FREE_TIER_ONLY_MODE: skip paid tiers (DeepSeek, Haiku), use Groq → Gemini → Random")
     args = parser.parse_args()
 
     if args.list:
@@ -921,6 +993,7 @@ def main():
         num_cycles=args.cycles,
         symbol=args.symbol,
         interval=args.interval,
+        free_tier_only=args.free_tier_only,
     )
 
 
