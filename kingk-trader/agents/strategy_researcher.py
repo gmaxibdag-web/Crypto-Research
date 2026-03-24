@@ -67,10 +67,10 @@ AVAILABLE_STRATEGIES = {
     "rsi_divergence_breakout": {
         "name": "RSI Divergence Breakout",
         "parameters": {
-            "rsi_oversold": 35, "rsi_overbought": 65, "vol_mult": 1.5,
-            "ema_period": 50, "tp": 0.08, "sl": 0.04,
+            "rsi_oversold": 35, "rsi_overbought": 65, "vol_mult": 1.8,
+            "ema_period": 50, "ema_proximity": 0.10, "tp": 0.06, "sl": 0.03,
         },
-        "description": "RSI oversold bounce + volume surge + price above EMA50",
+        "description": "RSI oversold bounce + volume surge + price near EMA50",
     },
 }
 
@@ -358,6 +358,8 @@ def main():
     parser = argparse.ArgumentParser(description="KingK Strategy Auto-Researcher")
     parser.add_argument("--baseline", "-b", type=str,
                         help=f"Baseline strategy. Choices: {list(AVAILABLE_STRATEGIES.keys())}")
+    parser.add_argument("--strategy", type=str,
+                        help="Alias for --baseline (strategy module name)")
     parser.add_argument("--cycles",   "-c", type=int, default=10, help="Number of mutation cycles")
     parser.add_argument("--symbol",   "-s", type=str, default="XRPUSDT", help="Symbol e.g. XRPUSDT")
     parser.add_argument("--interval", "-i", type=str, default="240", help="Candle interval: 60, 240")
@@ -368,13 +370,15 @@ def main():
         list_generations()
         return
 
-    if not args.baseline:
+    # Support both --baseline and --strategy (alias)
+    strategy_arg = args.baseline or args.strategy
+    if not strategy_arg:
         parser.print_help()
         print(f"\nAvailable strategies: {list(AVAILABLE_STRATEGIES.keys())}")
         return
 
     run_research_loop(
-        strategy_name=args.baseline,
+        strategy_name=strategy_arg,
         num_cycles=args.cycles,
         symbol=args.symbol,
         interval=args.interval,

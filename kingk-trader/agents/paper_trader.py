@@ -2,19 +2,25 @@
 KingK Paper Trader — simulates live trading with real prices, zero risk.
 Tracks open positions, P&L, portfolio value in real time.
 State persists in logs/paper_portfolio.json
+
+Per-pair strategy routing: each symbol uses its configured strategy module
+to generate entry signals via generate_signals(df). Exit logic (TP/SL/EMA
+cross for ema_swing) remains hardcoded here for all pairs.
 """
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 import json
+import importlib.util
 from datetime import datetime, timezone
 from pathlib import Path
 from data.fetcher import get_klines, get_ticker
 from agents.failsafe import safe_call
-from config.settings import PAIRS, ALLOCATION, STRATEGY
+from config.settings import PAIRS, ALLOCATION, STRATEGY, STRATEGY_MODULE
 
 PORTFOLIO_FILE = Path(__file__).parent.parent / "logs" / "paper_portfolio.json"
 LOG_FILE       = Path(__file__).parent.parent / "logs" / "paper_trades.log"
+STRATEGIES_DIR = Path(__file__).parent.parent / "strategies"
 
 def now_utc():
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
@@ -41,46 +47,55 @@ def save_portfolio(p: dict):
     PORTFOLIO_FILE.parent.mkdir(exist_ok=True)
     PORTFOLIO_FILE.write_text(json.dumps(p, indent=2))
 
-def add_indicators(df, cfg):
+def load_strategy_module(module_name: str):
+    """Dynamically import a strategy module from strategies/."""
+    strategy_path = STRATEGIES_DIR / f"{module_name}.py"
+    if not strategy_path.exists():
+        raise FileNotFoundError(f"Strategy not found: {strategy_path}")
+    spec = importlib.util.spec_from_file_location(module_name, strategy_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+def add_ema_cross_indicators(df, cfg):
+    """Add EMA cross indicators used for exit logic on EMA-based strategies."""
     import numpy as np
     df = df.copy()
-    df["ema_fast"]  = df["close"].ewm(span=cfg["ema_fast"],  adjust=False).mean()
-    df["ema_slow"]  = df["close"].ewm(span=cfg["ema_slow"],  adjust=False).mean()
-    df["ema_trend"] = df["close"].ewm(span=cfg["ema_trend"], adjust=False).mean()
-    delta = df["close"].diff()
-    gain  = delta.clip(lower=0)
-    loss  = -delta.clip(upper=0)
-    ag    = gain.ewm(com=13, adjust=False).mean()
-    al    = loss.ewm(com=13, adjust=False).mean()
-    rs    = ag / al.replace(0, np.nan)
-    df["rsi"]      = 100 - (100 / (1 + rs))
-    df["vol_ma20"] = df["volume"].rolling(20).mean()
-    df["cross_up"]   = (df["ema_fast"] > df["ema_slow"]) & (df["ema_fast"].shift(1) <= df["ema_slow"].shift(1))
-    df["cross_down"] = (df["ema_fast"] < df["ema_slow"]) & (df["ema_fast"].shift(1) >= df["ema_slow"].shift(1))
+    ema_fast_span = cfg.get("ema_fast", 9)
+    ema_slow_span = cfg.get("ema_slow", 21)
+    df["_ema_fast"] = df["close"].ewm(span=ema_fast_span, adjust=False).mean()
+    df["_ema_slow"] = df["close"].ewm(span=ema_slow_span, adjust=False).mean()
+    df["cross_down"] = (df["_ema_fast"] < df["_ema_slow"]) & \
+                       (df["_ema_fast"].shift(1) >= df["_ema_slow"].shift(1))
     return df
 
 def get_signal(symbol: str) -> dict | None:
     cfg = STRATEGY[symbol]
-    df  = get_klines(symbol, interval="240", limit=150)
-    df  = add_indicators(df, cfg)
-    last = df.iloc[-1]
+    module_name = STRATEGY_MODULE.get(symbol, "ema_swing")
+    df = get_klines(symbol, interval="240", limit=150)
+
+    # Load the correct strategy module dynamically
+    strategy_mod = load_strategy_module(module_name)
+    df_with_signals = strategy_mod.generate_signals(df)
+
+    # Get last row signal: 1=buy, -1=sell, 0=hold
+    last = df_with_signals.iloc[-1]
+    entry_signal = int(last["signal"])  # 1=buy, -1=sell, 0=hold
+
+    # Add EMA cross for exit logic (available for all strategies)
+    df_with_cross = add_ema_cross_indicators(df, cfg)
+    last_cross = df_with_cross.iloc[-1]
+    cross_down = bool(last_cross["cross_down"])
+
     ticker = get_ticker(symbol)
     price  = float(ticker["lastPrice"])
 
     return {
-        "price":      price,
-        "ema_fast":   round(last["ema_fast"], 5),
-        "ema_slow":   round(last["ema_slow"], 5),
-        "ema_trend":  round(last["ema_trend"], 5),
-        "rsi":        round(last["rsi"], 2),
-        "volume":     last["volume"],
-        "vol_ma20":   round(last["vol_ma20"], 2),
-        "cross_up":   bool(last["cross_up"]),
-        "cross_down": bool(last["cross_down"]),
-        "trend_ok":   price > last["ema_trend"],
-        "rsi_ok":     cfg["rsi_min"] <= last["rsi"] <= cfg["rsi_max"],
-        "vol_ok":     last["volume"] > last["vol_ma20"] * cfg["vol_mult"],
-        "cfg":        cfg,
+        "price":        price,
+        "entry_signal": entry_signal,   # 1=buy, -1=sell, 0=hold from strategy
+        "cross_down":   cross_down,     # EMA cross exit signal
+        "cfg":          cfg,
+        "module":       module_name,
     }
 
 def run_paper_trader():
@@ -97,13 +112,16 @@ def run_paper_trader():
         cfg   = data["cfg"]
         price = data["price"]
         alloc = ALLOCATION[symbol]
+        module_name = data["module"]
 
         # --- Check exits first ---
         if symbol in p["positions"]:
             pos = p["positions"][symbol]
             hit_tp = price >= pos["tp"]
             hit_sl = price <= pos["sl"]
-            hit_x  = data["cross_down"]
+            # Exit on strategy sell signal OR EMA cross down (whichever fires first)
+            strategy_exit = data["entry_signal"] == -1
+            hit_x  = data["cross_down"] or strategy_exit
 
             if hit_tp or hit_sl or hit_x:
                 reason    = "TP 🎯" if hit_tp else ("SL 🛑" if hit_sl else "EMA_X")
@@ -126,7 +144,7 @@ def run_paper_trader():
 
         # --- Check entries ---
         if symbol not in p["positions"] and p["cash"] >= alloc:
-            buy = data["cross_up"] and data["trend_ok"] and data["rsi_ok"] and data["vol_ok"]
+            buy = data["entry_signal"] == 1
             if buy:
                 tp_price = round(price * (1 + cfg["tp"]), 6)
                 sl_price = round(price * (1 - cfg["sl"]), 6)
@@ -138,10 +156,11 @@ def run_paper_trader():
                     "tp":          tp_price,
                     "sl":          sl_price,
                     "entry_time":  now_utc(),
+                    "strategy":    module_name,
                 }
-                log(f"  {symbol} 🟢 BUY {qty} @ ${price} | TP ${tp_price} | SL ${sl_price}")
+                log(f"  {symbol} 🟢 BUY {qty} @ ${price} | TP ${tp_price} | SL ${sl_price} | via {module_name}")
             else:
-                log(f"  {symbol} ⚪ HOLD — trend:{data['trend_ok']} rsi:{data['rsi_ok']} vol:{data['vol_ok']} cross:{data['cross_up']}")
+                log(f"  {symbol} ⚪ HOLD — signal:{data['entry_signal']} cross_down:{data['cross_down']} | via {module_name}")
 
         elif symbol in p["positions"]:
             pos = p["positions"][symbol]

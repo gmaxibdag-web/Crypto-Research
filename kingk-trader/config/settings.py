@@ -51,3 +51,9 @@ STRATEGY = {
 # Note: higher P&L but lower Sharpe than EMA Swing
 
 INTERVAL = "240"   # 4h candles
+
+# --- Per-pair strategy module routing ---
+STRATEGY_MODULE = {
+    "XRPUSDT": "rsi_divergence_breakout",
+    "SUIUSDT": "ema_swing",
+}
