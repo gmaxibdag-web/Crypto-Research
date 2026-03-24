@@ -117,7 +117,17 @@ _Curated knowledge. Updated as we go._
 | EMA Swing | XRP | 32 | -$7 | -0.04 | 34.4% | -19.3% |
 | Bollinger MR | both | — | negative | negative | — | deep |
 
-### Current Live Config (as of 2026-03-24 07:31 UTC)
+### Current Live Config (as of 2026-03-24 11:37 UTC — TESTNET DEPLOYED)
+
+**🚀 TESTNET FORWARD TEST LIVE (2-week trial)**
+- TRADING_MODE: testnet
+- TESTNET_ENABLED: True
+- AUTO_CONFIRM_TESTNET: true (auto-approve orders)
+- Demo account: Bybit demo trading API
+- Capital: $5000 ($1000 per pair)
+- Test duration: 2 weeks (until 2026-04-07)
+
+### Previous Config (Paper Trading — 2026-03-24 07:31 UTC)
 - **XRPUSDT → funding_rate_divergence** 🏆 (funding<-0.00005, OI drop >2%, RSI<50) — Sharpe **0.520**, **+$144**
 - **SUIUSDT → funding_rate_divergence** 🏆 (same params) — Sharpe **0.696**, **+$132**
 - Previous winners: RSI Divergence XRP (+$66, 0.473), EMA Swing SUI (+$60, 0.213) — both **superseded**
