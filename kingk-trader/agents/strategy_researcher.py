@@ -2,12 +2,12 @@
 """
 KingK Strategy Auto-Researcher
 Autonomously generates, backtests, and optimizes trading strategy parameters.
-Uses Gemini Flash Lite for lightweight parameter mutations (saves costs),
-Groq for deep synthesis when needed.
+Uses a smart fallback chain: Groq → DeepSeek → Gemini → Haiku → Random
+with comprehensive quota tracking for each model.
 
 Usage:
   python3 agents/strategy_researcher.py --baseline ema_swing --cycles 10
-  python3 agents/strategy_researcher.py --baseline macd_rsi --cycles 5 --symbol SUIUSDT
+  python3 agents/strategy_researcher.py --strategy funding_rate_divergence --symbol XRPUSDT --cycles 5
   python3 agents/strategy_researcher.py --list    # show all strategy generations
 """
 
@@ -15,9 +15,11 @@ import os
 import sys
 import json
 import time
+import random
 import argparse
 import subprocess
-from datetime import datetime
+import requests
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -31,12 +33,53 @@ try:
 except ImportError:
     pass
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-RESEARCH_DIR = BASE_DIR / "research"
-BACKTEST_DIR = RESEARCH_DIR / "backtests"
+GROQ_API_KEY    = os.getenv("GROQ_API_KEY")
+GEMINI_API_KEY  = os.getenv("GEMINI_API_KEY")
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+
+RESEARCH_DIR  = BASE_DIR / "research"
+BACKTEST_DIR  = RESEARCH_DIR / "backtests"
 STRATEGIES_DIR = BASE_DIR / "strategies"
+DATA_DIR      = BASE_DIR / "data"
+QUOTA_STATE_FILE = DATA_DIR / "model_quota_state.json"
+
 BACKTEST_DIR.mkdir(parents=True, exist_ok=True)
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+# ── Default quota state ───────────────────────────────────────────────────────
+DEFAULT_QUOTA_STATE = {
+    "last_checked_at": datetime.now(timezone.utc).isoformat(),
+    "models": {
+        "groq": {
+            "remaining_requests": 5000,
+            "limit_tokens_per_min": 0,
+            "available": True,
+            "last_check": datetime.now(timezone.utc).isoformat(),
+            "quota_exhausted_at": None,
+        },
+        "deepseek": {
+            "remaining_requests": 50,
+            "limit_tokens_per_min": 60000,
+            "available": True,
+            "last_check": datetime.now(timezone.utc).isoformat(),
+        },
+        "gemini": {
+            "free_tier_limit_queries_per_min": 15,
+            "free_tier_limit_queries_per_day": 1500,
+            "queries_today": 0,
+            "queries_this_minute": 0,
+            "last_check": datetime.now(timezone.utc).isoformat(),
+            "last_minute_reset": datetime.now(timezone.utc).isoformat(),
+            "last_day_reset": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            "available": True,
+        },
+        "haiku": {
+            "available": True,
+            "note": "Anthropic provides generous limits, track conservatively",
+        },
+    }
+}
 
 # Available baseline strategies (actual files in strategies/)
 AVAILABLE_STRATEGIES = {
@@ -72,109 +115,479 @@ AVAILABLE_STRATEGIES = {
         },
         "description": "RSI oversold bounce + volume surge + price near EMA50",
     },
+    "funding_rate_divergence": {
+        "name": "Funding Rate Divergence",
+        "parameters": {
+            "funding_threshold": 0.0003, "rsi_min": 40, "rsi_max": 60,
+            "vol_mult": 1.5, "tp": 0.04, "sl": 0.02,
+        },
+        "description": "Trade when funding rate diverges from price action",
+    },
 }
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def log(msg):
-    ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    ts = datetime.utcnow().strftime("%H:%M")
     print(f"[{ts}] {msg}", flush=True)
 
 
-def mutate_strategy_with_haiku(baseline_strategy: dict, variation_number: int) -> Optional[dict]:
-    """Use Claude Haiku (cheaper) to generate a parameter mutation."""
+def now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def now_date() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+
+# ── Quota State Management ────────────────────────────────────────────────────
+
+def load_quota_state() -> dict:
+    """Load quota state from JSON file. Returns default state if file missing."""
     try:
-        from anthropic import Anthropic
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-        if not api_key:
-            log("  ⚠ No ANTHROPIC_API_KEY — trying Groq instead")
-            return mutate_strategy_with_groq(baseline_strategy, variation_number)
-        
-        client = Anthropic(api_key=api_key)
-        log(f"🧬 Haiku mutation #{variation_number} (cheap)...")
-        
-        response = client.messages.create(
-            model="claude-haiku-4-5",
-            max_tokens=500,
-            messages=[{
-                "role": "user",
-                "content": f"""You are a quantitative trading strategist. Mutate ONE parameter slightly.
+        if QUOTA_STATE_FILE.exists():
+            with open(QUOTA_STATE_FILE) as f:
+                state = json.load(f)
+            # Ensure all model keys exist (merge with defaults)
+            for model, defaults in DEFAULT_QUOTA_STATE["models"].items():
+                if model not in state["models"]:
+                    state["models"][model] = dict(defaults)
+            return state
+    except Exception as e:
+        log(f"  ⚠ Could not load quota state: {e} — using defaults")
+    return dict(DEFAULT_QUOTA_STATE)
+
+
+def save_quota_state(state: dict) -> None:
+    """Write quota state back to JSON file with updated timestamp."""
+    try:
+        state["last_checked_at"] = now_iso()
+        with open(QUOTA_STATE_FILE, "w") as f:
+            json.dump(state, f, indent=2, default=str)
+    except Exception as e:
+        log(f"  ⚠ Could not save quota state: {e}")
+
+
+def should_use_model(model_name: str, quota_state: dict) -> bool:
+    """
+    Check if model quota is available.
+    Returns False if exhausted or in cooldown.
+    Handles Gemini minute/day reset logic.
+    """
+    # 'random' is always available
+    if model_name == "random":
+        return True
+
+    models = quota_state.get("models", {})
+    if model_name not in models:
+        return True  # Unknown model — assume available
+
+    m = models[model_name]
+
+    # Basic availability flag
+    if not m.get("available", True):
+        # Check if cooldown period has passed (1 hour after exhaustion)
+        exhausted_at = m.get("quota_exhausted_at")
+        if exhausted_at:
+            try:
+                exhausted_dt = datetime.fromisoformat(exhausted_at.replace("Z", "+00:00"))
+                if datetime.now(timezone.utc) - exhausted_dt > timedelta(hours=1):
+                    # Reset availability
+                    m["available"] = True
+                    m["quota_exhausted_at"] = None
+                    save_quota_state(quota_state)
+                    log(f"  ↺ {model_name} cooldown expired — re-enabling")
+                    return True
+            except Exception:
+                pass
+        return False
+
+    # Gemini-specific: check minute/day limits
+    if model_name == "gemini":
+        today = now_date()
+        last_day_reset = m.get("last_day_reset", "")
+        if last_day_reset != today:
+            m["queries_today"] = 0
+            m["last_day_reset"] = today
+
+        # Check minute reset (sliding window)
+        last_min_reset = m.get("last_minute_reset", now_iso())
+        try:
+            reset_dt = datetime.fromisoformat(last_min_reset.replace("Z", "+00:00"))
+            if datetime.now(timezone.utc) - reset_dt > timedelta(minutes=1):
+                m["queries_this_minute"] = 0
+                m["last_minute_reset"] = now_iso()
+        except Exception:
+            m["queries_this_minute"] = 0
+            m["last_minute_reset"] = now_iso()
+
+        daily_limit = m.get("free_tier_limit_queries_per_day", 1500)
+        min_limit   = m.get("free_tier_limit_queries_per_min", 15)
+
+        if m.get("queries_today", 0) >= daily_limit:
+            log(f"  ⊘ gemini daily quota exhausted ({m['queries_today']}/{daily_limit})")
+            return False
+        if m.get("queries_this_minute", 0) >= min_limit:
+            log(f"  ⊘ gemini rate limited this minute ({m['queries_this_minute']}/{min_limit})")
+            return False
+
+    # Groq/DeepSeek: check remaining requests
+    if model_name in ("groq", "deepseek"):
+        remaining = m.get("remaining_requests", 1)
+        if remaining is not None and remaining <= 0:
+            return False
+
+    return True
+
+
+def mark_model_quota_exhausted(model_name: str, quota_state: dict) -> None:
+    """Mark a model as quota-exhausted and persist state."""
+    models = quota_state.get("models", {})
+    if model_name in models:
+        models[model_name]["available"] = False
+        models[model_name]["quota_exhausted_at"] = now_iso()
+        models[model_name]["last_check"] = now_iso()
+        save_quota_state(quota_state)
+
+
+def update_quota_after_success(model_name: str, quota_state: dict,
+                                response_headers: dict = None) -> None:
+    """Update quota state after a successful model call."""
+    models = quota_state.get("models", {})
+    if model_name not in models:
+        return
+
+    m = models[model_name]
+    m["last_check"] = now_iso()
+
+    if model_name == "groq" and response_headers:
+        remaining = response_headers.get("x-ratelimit-remaining-requests")
+        if remaining is not None:
+            try:
+                m["remaining_requests"] = int(remaining)
+            except (ValueError, TypeError):
+                pass
+        # Decrement if no header
+        elif m.get("remaining_requests") is not None and m["remaining_requests"] > 0:
+            m["remaining_requests"] -= 1
+
+    elif model_name == "deepseek" and response_headers:
+        remaining = response_headers.get("x-ratelimit-remaining-requests")
+        tokens_limit = response_headers.get("x-ratelimit-limit-tokens")
+        if remaining is not None:
+            try:
+                m["remaining_requests"] = int(remaining)
+            except (ValueError, TypeError):
+                pass
+        elif m.get("remaining_requests") is not None and m["remaining_requests"] > 0:
+            m["remaining_requests"] -= 1
+        if tokens_limit is not None:
+            try:
+                m["limit_tokens_per_min"] = int(tokens_limit)
+            except (ValueError, TypeError):
+                pass
+
+    elif model_name == "gemini":
+        m["queries_today"] = m.get("queries_today", 0) + 1
+        m["queries_this_minute"] = m.get("queries_this_minute", 0) + 1
+
+    elif model_name == "haiku":
+        # Conservative tracking only
+        pass
+
+    save_quota_state(quota_state)
+
+
+# ── Quota Check Functions ─────────────────────────────────────────────────────
+
+def check_groq_quota() -> dict:
+    """
+    Query Groq API for remaining quota.
+    Returns {"remaining": int, "available": bool, "error": str or None}
+    Falls back gracefully if unavailable.
+    """
+    if not GROQ_API_KEY:
+        return {"remaining": None, "available": False, "error": "No GROQ_API_KEY"}
+    try:
+        resp = requests.get(
+            "https://api.groq.com/openai/v1/models",
+            headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
+            timeout=5,
+        )
+        if resp.status_code == 200:
+            remaining = resp.headers.get("x-ratelimit-remaining-requests")
+            return {
+                "remaining": int(remaining) if remaining else None,
+                "available": True,
+                "error": None,
+            }
+        elif resp.status_code == 429:
+            return {"remaining": 0, "available": False, "error": "Rate limited"}
+        else:
+            return {"remaining": None, "available": True, "error": f"HTTP {resp.status_code}"}
+    except Exception as e:
+        # Graceful degrade: assume available
+        return {"remaining": None, "available": True, "error": str(e)}
+
+
+def check_deepseek_quota() -> dict:
+    """
+    Send a minimal test call to DeepSeek and parse rate limit headers.
+    Returns quota dict. Falls back gracefully if unavailable.
+    """
+    if not DEEPSEEK_API_KEY:
+        return {"remaining": None, "available": False, "error": "No DEEPSEEK_API_KEY"}
+    try:
+        resp = requests.post(
+            "https://api.deepseek.com/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "deepseek-chat",
+                "messages": [{"role": "user", "content": "hi"}],
+                "max_tokens": 1,
+            },
+            timeout=10,
+        )
+        remaining = resp.headers.get("x-ratelimit-remaining-requests")
+        tokens_limit = resp.headers.get("x-ratelimit-limit-tokens")
+
+        if resp.status_code == 429:
+            return {
+                "remaining": 0,
+                "limit_tokens_per_min": int(tokens_limit) if tokens_limit else None,
+                "available": False,
+                "error": "Rate limited",
+            }
+        return {
+            "remaining": int(remaining) if remaining else None,
+            "limit_tokens_per_min": int(tokens_limit) if tokens_limit else None,
+            "available": resp.status_code < 500,
+            "error": None if resp.status_code < 400 else f"HTTP {resp.status_code}",
+        }
+    except Exception as e:
+        return {"remaining": None, "available": True, "error": str(e)}
+
+
+def check_gemini_quota(quota_state: dict) -> dict:
+    """
+    Track Gemini queries per day (1500 limit) and per minute (15 limit).
+    Returns {"queries_today": int, "available": bool, "rate_limit_this_min": bool}
+    """
+    m = quota_state.get("models", {}).get("gemini", {})
+    daily_limit = m.get("free_tier_limit_queries_per_day", 1500)
+    min_limit   = m.get("free_tier_limit_queries_per_min", 15)
+    queries_today   = m.get("queries_today", 0)
+    queries_this_min = m.get("queries_this_minute", 0)
+
+    return {
+        "queries_today": queries_today,
+        "queries_this_minute": queries_this_min,
+        "daily_limit": daily_limit,
+        "min_limit": min_limit,
+        "available": queries_today < daily_limit,
+        "rate_limit_this_min": queries_this_min >= min_limit,
+    }
+
+
+# ── Mutation Prompt ───────────────────────────────────────────────────────────
+
+MUTATION_PROMPT_TEMPLATE = """You are a quantitative trading strategist. Mutate ONE parameter slightly.
 
 BASELINE:
-{json.dumps(baseline_strategy, indent=2)}
-
-Return ONLY valid JSON with mutated strategy (no explanation):
-{{"name": "...", "parameters": {{...}}, "rationale": "..."}}"""
-            }]
-        )
-        
-        raw = response.content[0].text.strip()
-        if "```json" in raw:
-            raw = raw.split("```json")[1].split("```")[0].strip()
-        elif "```" in raw:
-            raw = raw.split("```")[1].split("```")[0].strip()
-        
-        mutated = json.loads(raw)
-        mutated["generation"] = variation_number
-        mutated["source"] = "haiku"
-        log(f"  ✓ {mutated.get('rationale', 'mutation applied')}")
-        return mutated
-    except Exception as e:
-        log(f"  ✗ Haiku error: {e} — falling back to random mutation")
-        return random_mutation(baseline_strategy, variation_number)
-
-
-def mutate_strategy_with_gemini(baseline_strategy: dict, variation_number: int) -> Optional[dict]:
-    """Use Gemini to generate a parameter mutation (if quota available)."""
-    try:
-        import google.generativeai as genai
-        if not GEMINI_API_KEY:
-            log("  ⚠ No GEMINI_API_KEY — trying Haiku instead")
-            return mutate_strategy_with_haiku(baseline_strategy, variation_number)
-
-        genai.configure(api_key=GEMINI_API_KEY)
-        log(f"🧬 Gemini mutation #{variation_number}...")
-
-        model = genai.GenerativeModel("gemini-2.0-flash-lite")
-        prompt = f"""You are a quantitative trading strategist. Mutate ONE parameter slightly.
-
-BASELINE STRATEGY:
-{json.dumps(baseline_strategy, indent=2)}
+{baseline_json}
 
 MUTATION #: {variation_number}
 
 Pick ONE numeric parameter and tweak it by 10-20%. Keep all other parameters unchanged.
-Return ONLY valid JSON (no markdown):
+Return ONLY valid JSON (no markdown, no explanation):
 
-{{
-  "name": "Strategy name with variation #{variation_number}",
-  "parameters": {{ ... }},
-  "rationale": "One line explaining the mutation"
-}}"""
+{{"name": "Strategy name with variation #{variation_number}", "parameters": {{...}}, "rationale": "One line explaining the mutation"}}"""
 
+
+def _parse_json_response(raw: str) -> dict:
+    """Strip markdown fences and parse JSON."""
+    if "```json" in raw:
+        raw = raw.split("```json")[1].split("```")[0].strip()
+    elif "```" in raw:
+        raw = raw.split("```")[1].split("```")[0].strip()
+    return json.loads(raw.strip())
+
+
+# ── Mutation Functions ────────────────────────────────────────────────────────
+
+def mutate_with_groq(baseline_strategy: dict, variation_number: int,
+                     quota_state: dict = None) -> Optional[dict]:
+    """Use Groq Llama (cheap, fast) to generate a parameter mutation."""
+    if not GROQ_API_KEY:
+        return None
+
+    prompt = MUTATION_PROMPT_TEMPLATE.format(
+        baseline_json=json.dumps(baseline_strategy, indent=2),
+        variation_number=variation_number,
+    )
+
+    try:
+        resp = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "llama-3.1-8b-instant",
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.7,
+                "max_tokens": 300,
+            },
+            timeout=30,
+        )
+
+        if resp.status_code == 429:
+            raise RateLimitError("groq", "Rate limited (429)")
+
+        resp.raise_for_status()
+
+        if quota_state:
+            update_quota_after_success("groq", quota_state, dict(resp.headers))
+
+        raw = resp.json()["choices"][0]["message"]["content"]
+        mutated = _parse_json_response(raw)
+        mutated["generation"] = variation_number
+        mutated["source"] = "groq_llama_8b"
+        return mutated
+
+    except RateLimitError:
+        raise
+    except Exception as e:
+        raise Exception(f"Groq error: {e}") from e
+
+
+def mutate_with_deepseek(baseline_strategy: dict, variation_number: int,
+                          quota_state: dict = None) -> Optional[dict]:
+    """Use DeepSeek API to generate a parameter mutation."""
+    if not DEEPSEEK_API_KEY:
+        return None
+
+    prompt = MUTATION_PROMPT_TEMPLATE.format(
+        baseline_json=json.dumps(baseline_strategy, indent=2),
+        variation_number=variation_number,
+    )
+
+    try:
+        resp = requests.post(
+            "https://api.deepseek.com/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "deepseek-chat",
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.7,
+                "max_tokens": 300,
+            },
+            timeout=30,
+        )
+
+        if resp.status_code == 429:
+            raise RateLimitError("deepseek", "Rate limited (429)")
+
+        resp.raise_for_status()
+
+        if quota_state:
+            update_quota_after_success("deepseek", quota_state, dict(resp.headers))
+
+        raw = resp.json()["choices"][0]["message"]["content"]
+        mutated = _parse_json_response(raw)
+        mutated["generation"] = variation_number
+        mutated["source"] = "deepseek"
+        return mutated
+
+    except RateLimitError:
+        raise
+    except Exception as e:
+        raise Exception(f"DeepSeek error: {e}") from e
+
+
+def mutate_with_gemini(baseline_strategy: dict, variation_number: int,
+                        quota_state: dict = None) -> Optional[dict]:
+    """Use Gemini Flash Lite to generate a parameter mutation with daily/minute tracking."""
+    if not GEMINI_API_KEY:
+        return None
+
+    try:
+        import google.generativeai as genai
+    except ImportError:
+        return None
+
+    prompt = MUTATION_PROMPT_TEMPLATE.format(
+        baseline_json=json.dumps(baseline_strategy, indent=2),
+        variation_number=variation_number,
+    )
+
+    try:
+        genai.configure(api_key=GEMINI_API_KEY)
+        model = genai.GenerativeModel("gemini-2.0-flash-lite")
         response = model.generate_content(prompt)
         raw = response.text.strip()
 
-        # Strip markdown code fences if present
-        if "```json" in raw:
-            raw = raw.split("```json")[1].split("```")[0].strip()
-        elif "```" in raw:
-            raw = raw.split("```")[1].split("```")[0].strip()
+        if quota_state:
+            update_quota_after_success("gemini", quota_state)
 
-        mutated = json.loads(raw)
+        mutated = _parse_json_response(raw)
         mutated["generation"] = variation_number
         mutated["source"] = "gemini"
-        log(f"  ✓ Mutation: {mutated.get('rationale', 'N/A')}")
         return mutated
 
     except Exception as e:
-        log(f"  ✗ Gemini error: {e} — falling back to random mutation")
-        return random_mutation(baseline_strategy, variation_number)
+        err_str = str(e).lower()
+        if "429" in err_str or "quota" in err_str or "rate" in err_str:
+            raise RateLimitError("gemini", str(e))
+        raise Exception(f"Gemini error: {e}") from e
 
 
-def random_mutation(baseline_strategy: dict, variation_number: int) -> dict:
+def mutate_with_haiku(baseline_strategy: dict, variation_number: int,
+                       quota_state: dict = None) -> Optional[dict]:
+    """Use Claude Haiku (last resort, reliable) to generate a parameter mutation."""
+    if not ANTHROPIC_API_KEY:
+        return None
+
+    prompt = MUTATION_PROMPT_TEMPLATE.format(
+        baseline_json=json.dumps(baseline_strategy, indent=2),
+        variation_number=variation_number,
+    )
+
+    try:
+        from anthropic import Anthropic
+        client = Anthropic(api_key=ANTHROPIC_API_KEY)
+        response = client.messages.create(
+            model="claude-haiku-4-5",
+            max_tokens=500,
+            messages=[{"role": "user", "content": prompt}],
+        )
+
+        if quota_state:
+            update_quota_after_success("haiku", quota_state)
+
+        raw = response.content[0].text.strip()
+        mutated = _parse_json_response(raw)
+        mutated["generation"] = variation_number
+        mutated["source"] = "haiku"
+        return mutated
+
+    except Exception as e:
+        err_str = str(e).lower()
+        if "429" in err_str or "overloaded" in err_str or "rate" in err_str:
+            raise RateLimitError("haiku", str(e))
+        raise Exception(f"Haiku error: {e}") from e
+
+
+def random_mutation(baseline_strategy: dict, variation_number: int,
+                    quota_state: dict = None) -> dict:
     """Fallback: randomly tweak one numeric parameter by ±15%."""
-    import random
     params = dict(baseline_strategy.get("parameters", {}))
     if not params:
         return None
@@ -194,48 +607,15 @@ def random_mutation(baseline_strategy: dict, variation_number: int) -> dict:
     }
 
 
-def mutate_strategy_with_groq(baseline_strategy: dict, variation_number: int) -> Optional[dict]:
-    """Use Groq Llama (cheap, fast) to generate a parameter mutation."""
-    try:
-        from groq import Groq
-        if not GROQ_API_KEY:
-            log("  ⚠ No GROQ_API_KEY — using random mutation fallback")
-            return random_mutation(baseline_strategy, variation_number)
-        
-        client = Groq(api_key=GROQ_API_KEY)
-        log(f"🧬 Groq Llama mutation #{variation_number} (ultra-cheap)...")
-        
-        response = client.chat.completions.create(
-            model="llama-3.1-8b-instant",  # Cheaper than 70b, still solid reasoning
-            messages=[{
-                "role": "user",
-                "content": f"""You are a quantitative trading strategist. Mutate ONE parameter slightly.
+# ── Custom Exception ──────────────────────────────────────────────────────────
 
-BASELINE:
-{json.dumps(baseline_strategy, indent=2)}
+class RateLimitError(Exception):
+    def __init__(self, model_name: str, message: str = ""):
+        self.model_name = model_name
+        super().__init__(message or f"{model_name} rate limited")
 
-Return ONLY valid JSON with mutated strategy (no explanation):
-{{"name": "...", "parameters": {{...}}, "rationale": "..."}}"""
-            }],
-            temperature=0.7,
-            max_tokens=300,
-        )
-        
-        raw = response.choices[0].message.content.strip()
-        if "```json" in raw:
-            raw = raw.split("```json")[1].split("```")[0].strip()
-        elif "```" in raw:
-            raw = raw.split("```")[1].split("```")[0].strip()
-        
-        mutated = json.loads(raw)
-        mutated["generation"] = variation_number
-        mutated["source"] = "groq_llama_8b"
-        log(f"  ✓ {mutated.get('rationale', 'mutation applied')}")
-        return mutated
-    except Exception as e:
-        log(f"  ✗ Groq error: {e} — falling back to random mutation")
-        return random_mutation(baseline_strategy, variation_number)
 
+# ── Backtest Helpers ──────────────────────────────────────────────────────────
 
 def backtest_strategy(strategy_name: str, parameters: dict,
                       symbol: str = "XRPUSDT", interval: str = "240") -> dict:
@@ -260,7 +640,6 @@ def backtest_strategy(strategy_name: str, parameters: dict,
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
 
         if result.returncode == 0 and result.stdout.strip():
-            # Find the JSON line (might have other output mixed in)
             for line in result.stdout.strip().split("\n"):
                 line = line.strip()
                 if line.startswith("{"):
@@ -316,7 +695,7 @@ def save_generation(generation_number: int, strategy_name: str,
 
 def compare_strategies(current_best: dict, candidate: dict) -> bool:
     """Returns True if candidate is better than current_best (by Sharpe ratio)."""
-    current_sharpe  = current_best.get("backtest", {}).get("sharpe_ratio", -999) or -999
+    current_sharpe   = current_best.get("backtest", {}).get("sharpe_ratio", -999) or -999
     candidate_sharpe = candidate.get("backtest", {}).get("sharpe_ratio", -999) or -999
 
     if candidate.get("lookahead_bias_flag", False):
@@ -335,9 +714,11 @@ def compare_strategies(current_best: dict, candidate: dict) -> bool:
         return False
 
 
+# ── Main Research Loop ────────────────────────────────────────────────────────
+
 def run_research_loop(strategy_name: str, num_cycles: int = 10,
                       symbol: str = "XRPUSDT", interval: str = "240"):
-    """Main research loop: baseline → mutate → backtest → keep winners."""
+    """Main research loop with smart model fallback chain and quota tracking."""
     if strategy_name not in AVAILABLE_STRATEGIES:
         log(f"❌ Unknown strategy: {strategy_name}. Available: {list(AVAILABLE_STRATEGIES.keys())}")
         return None
@@ -345,6 +726,18 @@ def run_research_loop(strategy_name: str, num_cycles: int = 10,
     baseline_info = AVAILABLE_STRATEGIES[strategy_name]
     log(f"🚀 Research loop: {strategy_name} | {num_cycles} cycles | {symbol} {interval}")
     log(f"   Baseline: {baseline_info['description']}")
+
+    # Load quota state
+    quota_state = load_quota_state()
+
+    # Define fallback chain: (model_name, mutator_func)
+    mutation_attempt_order = [
+        ("groq",     mutate_with_groq),
+        ("deepseek", mutate_with_deepseek),
+        ("gemini",   mutate_with_gemini),
+        ("haiku",    mutate_with_haiku),
+        ("random",   random_mutation),
+    ]
 
     # First, backtest the baseline
     log(f"\n📍 BASELINE")
@@ -362,7 +755,6 @@ def run_research_loop(strategy_name: str, num_cycles: int = 10,
     for cycle in range(1, num_cycles + 1):
         log(f"\n📍 GENERATION {cycle}/{num_cycles}")
 
-        # Generate mutation using current best params
         best_params = current_best.get("strategy", {}).get("parameters",
                       baseline_info["parameters"])
         mutation_base = {
@@ -370,16 +762,47 @@ def run_research_loop(strategy_name: str, num_cycles: int = 10,
             "parameters": dict(best_params),
         }
 
-        # Try cheaper models first (Haiku > Groq > Gemini > Random)
         mutated = None
-        for mutator in [mutate_strategy_with_haiku, mutate_strategy_with_groq, 
-                        mutate_strategy_with_gemini, random_mutation]:
-            mutated = mutator(mutation_base, cycle)
-            if mutated:
-                break
-        
+
+        for model_name, mutator_func in mutation_attempt_order:
+            if not should_use_model(model_name, quota_state):
+                log(f"  ⊘ {model_name} quota exhausted, skipping")
+                continue
+
+            # Show quota info
+            m = quota_state["models"].get(model_name, {})
+            if model_name == "groq":
+                remaining = m.get("remaining_requests", "?")
+                quota_str = f"{remaining}/5000 requests"
+            elif model_name == "deepseek":
+                remaining = m.get("remaining_requests", "?")
+                quota_str = f"{remaining}/50 requests/min"
+            elif model_name == "gemini":
+                qd = m.get("queries_today", 0)
+                qm = m.get("queries_this_minute", 0)
+                quota_str = f"{qd}/1500 today, {qm}/15 this min"
+            elif model_name == "haiku":
+                quota_str = "Anthropic (generous)"
+            else:
+                quota_str = "unlimited"
+
+            log(f"  → {model_name} ({quota_str})...")
+
+            try:
+                mutated = mutator_func(mutation_base, cycle, quota_state)
+                if mutated:
+                    log(f"    ✓ {model_name} success — {mutated.get('rationale', 'mutation applied')}")
+                    break
+            except RateLimitError as e:
+                log(f"    ✗ {model_name} rate limit — marking exhausted")
+                mark_model_quota_exhausted(model_name, quota_state)
+                continue
+            except Exception as e:
+                log(f"    ✗ {model_name} error: {e}")
+                continue
+
         if not mutated:
-            log("  ✗ All mutation methods failed")
+            log("  ✗ All mutation methods failed — skipping cycle")
             continue
 
         # Backtest the mutation
@@ -393,12 +816,13 @@ def run_research_loop(strategy_name: str, num_cycles: int = 10,
 
         if compare_strategies(current_best, record):
             current_best = record
-            # Mark as best
             current_best["is_best"] = True
 
         log(f"  Current best: Gen {current_best['generation']} "
             f"(Sharpe {current_best['backtest'].get('sharpe_ratio', '?')})")
 
+        # Persist updated quota state
+        save_quota_state(quota_state)
         time.sleep(1)  # Be kind to APIs
 
     # Final summary
@@ -412,6 +836,21 @@ def run_research_loop(strategy_name: str, num_cycles: int = 10,
         log(f"  Total P&L:       ${bt.get('total_pnl_usd', 0):.2f}")
         log(f"  Max drawdown:    {bt.get('max_drawdown', 0)*100:.1f}%")
         log(f"  Parameters:      {current_best['strategy'].get('parameters', {})}")
+        log(f"  Mutation source: {current_best['strategy'].get('source', '?')}")
+
+    # Print final quota summary
+    log(f"\n📊 QUOTA SUMMARY")
+    for model_name, m in quota_state["models"].items():
+        avail = "✅" if m.get("available", True) else "❌"
+        if model_name == "groq":
+            log(f"  {avail} groq:     {m.get('remaining_requests', '?')} requests remaining")
+        elif model_name == "deepseek":
+            log(f"  {avail} deepseek: {m.get('remaining_requests', '?')} requests/min remaining")
+        elif model_name == "gemini":
+            log(f"  {avail} gemini:   {m.get('queries_today', 0)}/1500 today, "
+                f"{m.get('queries_this_minute', 0)}/15 this min")
+        elif model_name == "haiku":
+            log(f"  {avail} haiku:    (generous Anthropic limits)")
     log(f"{'='*60}")
 
     return current_best
@@ -433,18 +872,20 @@ def list_generations():
         return
 
     print(f"\n📚 Strategy Generations ({len(records)} total):")
-    print(f"  {'Gen':>4} | {'Strategy':<30} | {'Sharpe':>8} | {'WinRate':>8} | {'P&L':>8} | Bias")
-    print(f"  {'-'*4}-+-{'-'*30}-+-{'-'*8}-+-{'-'*8}-+-{'-'*8}-+------")
+    print(f"  {'Gen':>4} | {'Strategy':<30} | {'Sharpe':>8} | {'WinRate':>8} | {'P&L':>8} | {'Source':<12} | Bias")
+    print(f"  {'-'*4}-+-{'-'*30}-+-{'-'*8}-+-{'-'*8}-+-{'-'*8}-+-{'-'*12}-+------")
     for r in records:
-        gen     = r.get("generation", "?")
-        strat   = r.get("strategy_module", "?")[:30]
-        bt      = r.get("backtest", {})
-        sharpe  = bt.get("sharpe_ratio", 0) or 0
-        wr      = bt.get("win_rate", 0) or 0
-        pnl     = bt.get("total_pnl_usd", 0) or 0
-        best    = "🏆" if r.get("is_best") else "  "
-        bias    = "⚠️" if r.get("lookahead_bias_flag") else "✓"
-        print(f"  {best}{gen:>4} | {strat:<30} | {sharpe:>8.3f} | {wr*100:>7.1f}% | ${pnl:>7.2f} | {bias}")
+        gen    = r.get("generation", "?")
+        strat  = r.get("strategy_module", "?")[:30]
+        bt     = r.get("backtest", {})
+        sharpe = bt.get("sharpe_ratio", 0) or 0
+        wr     = bt.get("win_rate", 0) or 0
+        pnl    = bt.get("total_pnl_usd", 0) or 0
+        source = r.get("strategy", {}).get("source", "?")[:12]
+        best   = "🏆" if r.get("is_best") else "  "
+        bias   = "⚠️" if r.get("lookahead_bias_flag") else "✓"
+        print(f"  {best}{gen:>4} | {strat:<30} | {sharpe:>8.3f} | {wr*100:>7.1f}% | "
+              f"${pnl:>7.2f} | {source:<12} | {bias}")
 
 
 def main():
@@ -457,13 +898,18 @@ def main():
     parser.add_argument("--symbol",   "-s", type=str, default="XRPUSDT", help="Symbol e.g. XRPUSDT")
     parser.add_argument("--interval", "-i", type=str, default="240", help="Candle interval: 60, 240")
     parser.add_argument("--list",     "-l", action="store_true", help="List all generations")
+    parser.add_argument("--quota",    "-q", action="store_true", help="Show current quota state")
     args = parser.parse_args()
 
     if args.list:
         list_generations()
         return
 
-    # Support both --baseline and --strategy (alias)
+    if args.quota:
+        state = load_quota_state()
+        print(json.dumps(state, indent=2, default=str))
+        return
+
     strategy_arg = args.baseline or args.strategy
     if not strategy_arg:
         parser.print_help()
