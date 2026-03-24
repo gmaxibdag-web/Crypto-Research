@@ -1,4 +1,4 @@
-# KingK Trader - Config v2 (tuned 2026-03-21)
+# KingK Trader - Config v3 (tuned 2026-03-24 — param sweep + trend filters)
 
 BYBIT_API_KEY    = ""
 BYBIT_API_SECRET = ""
@@ -13,28 +13,41 @@ ALLOCATION = {
     "RESERVE": 200,
 }
 
-# --- TUNED STRATEGY PARAMS (backtested on 2.5yr data) ---
+# --- TUNED STRATEGY PARAMS (param sweep 2026-03-24, 4h 2yr backtest) ---
+# Winner: RSI Divergence on XRPUSDT (Sharpe=0.47, P&L=+$65.84, 26 trades)
+# EMA Swing remains primary on SUIUSDT (Sharpe=0.21, P&L=+$60.00)
 STRATEGY = {
+    # ── XRPUSDT: RSI Divergence Breakout (PROMOTED — beats all others on XRP) ──
+    # Tuned params: rsi_oversold=35, vol_mult=1.8
+    # Sharpe=0.4735 | P&L=+$65.84 | 26 trades | WinRate=42.3% | MaxDD=-10.2%
     "XRPUSDT": {
-        "ema_fast":  12,
-        "ema_slow":  26,
-        "ema_trend": 100,   # trend filter — only long above this
-        "rsi_min":   45,
-        "rsi_max":   65,
-        "vol_mult":  1.2,
-        "tp":        0.08,  # 8% take profit
-        "sl":        0.025, # 2.5% stop loss
+        "strategy":    "rsi_divergence_breakout",  # TUNED 2026-03-24
+        "rsi_oversold": 35,     # loosened from original 35 (kept best)
+        "rsi_overbought": 65,
+        "ema_period":  50,
+        "ema_proximity": 0.10,  # allow entries within 10% of EMA50
+        "vol_mult":    1.8,     # tuned (was 1.5)
+        "tp":          0.06,
+        "sl":          0.03,
     },
+    # ── SUIUSDT: EMA Swing (baseline — still best on SUI) ──
+    # Sharpe=0.2133 | P&L=+$60.00 | 40 trades | WinRate=37.5%
     "SUIUSDT": {
-        "ema_fast":  12,
-        "ema_slow":  26,
-        "ema_trend": 100,
-        "rsi_min":   50,
-        "rsi_max":   65,
-        "vol_mult":  1.2,
-        "tp":        0.05,  # 5% take profit
-        "sl":        0.03,  # 3% stop loss
+        "strategy":   "ema_swing",
+        "ema_fast":   12,
+        "ema_slow":   26,
+        "ema_trend":  100,
+        "rsi_min":    50,
+        "rsi_max":    65,
+        "vol_mult":   1.2,
+        "tp":         0.05,
+        "sl":         0.03,
     },
 }
+
+# --- MACD+RSI best tuned config (runner-up on SUI: P&L=+$172, Sharpe=0.166) ---
+# Use if SUI strategy needs upgrade:
+# macd_fast=8, macd_slow=17, macd_signal=9, rsi_max=70, ema_trend=100
+# Note: higher P&L but lower Sharpe than EMA Swing
 
 INTERVAL = "240"   # 4h candles

@@ -1,8 +1,10 @@
 """
-MACD + RSI Strategy
--------------------
+MACD + RSI Strategy (v2 — trend-filtered)
+------------------------------------------
 Entry:  MACD histogram crosses from negative to positive (MACD crosses signal line)
-        RSI(14) < 70 (not overbought)
+        RSI(14) < rsi_max (not overbought)
+        Price > EMA100 (trend filter — only longs in uptrends)
+        Minimum 5 bars since last trade (cooldown)
 Exit:   MACD histogram crosses from positive to negative
         OR -1 signal from strategy
 """
@@ -12,7 +14,7 @@ import numpy as np
 
 def add_indicators(df: pd.DataFrame,
                    macd_fast: int = 12, macd_slow: int = 26, macd_signal: int = 9,
-                   rsi_period: int = 14) -> pd.DataFrame:
+                   rsi_period: int = 14, ema_trend: int = 100) -> pd.DataFrame:
     df = df.copy()
 
     # MACD
@@ -31,28 +33,48 @@ def add_indicators(df: pd.DataFrame,
     rs = avg_gain / avg_loss.replace(0, np.nan)
     df["rsi"] = 100 - (100 / (1 + rs))
 
+    # EMA100 trend filter
+    df[f"ema{ema_trend}"] = df["close"].ewm(span=ema_trend, adjust=False).mean()
+
     return df
 
 
 def generate_signals(df: pd.DataFrame,
                      macd_fast: int = 12, macd_slow: int = 26, macd_signal_period: int = 9,
-                     rsi_period: int = 14, rsi_max: float = 70) -> pd.DataFrame:
+                     rsi_period: int = 14, rsi_max: float = 70,
+                     ema_trend: int = 100, min_bars_between_trades: int = 5) -> pd.DataFrame:
     """
-    Generate signals for MACD + RSI strategy.
+    Generate signals for MACD + RSI strategy with EMA100 trend filter and trade cooldown.
     signal: 1=buy, -1=sell, 0=hold
     """
     df = add_indicators(df, macd_fast=macd_fast, macd_slow=macd_slow,
-                         macd_signal=macd_signal_period, rsi_period=rsi_period)
+                         macd_signal=macd_signal_period, rsi_period=rsi_period,
+                         ema_trend=ema_trend)
+    ema_col = f"ema{ema_trend}"
     df["signal"] = 0
 
-    # Buy: MACD histogram crosses zero upward (MACD crosses above signal line) AND RSI < rsi_max
-    hist_cross_up = (df["macd_hist"] > 0) & (df["macd_hist"].shift(1) <= 0)
-    buy_cond = hist_cross_up & (df["rsi"] < rsi_max)
-    df.loc[buy_cond, "signal"] = 1
+    last_trade_bar = -999  # track bar index of last entry
 
-    # Sell: MACD histogram crosses zero downward
-    hist_cross_down = (df["macd_hist"] < 0) & (df["macd_hist"].shift(1) >= 0)
-    df.loc[hist_cross_down, "signal"] = -1
+    for i in range(len(df)):
+        row = df.iloc[i]
+
+        # Buy: MACD histogram crosses zero upward AND RSI < rsi_max
+        #      AND price > EMA100 (trend filter)
+        #      AND minimum bars since last trade
+        hist_cross_up = (row["macd_hist"] > 0) and (df.iloc[i - 1]["macd_hist"] <= 0) if i > 0 else False
+        rsi_ok = row["rsi"] < rsi_max
+        trend_ok = row["close"] > row[ema_col]
+        cooldown_ok = (i - last_trade_bar) >= min_bars_between_trades
+
+        if hist_cross_up and rsi_ok and trend_ok and cooldown_ok:
+            df.at[df.index[i], "signal"] = 1
+            last_trade_bar = i
+
+        # Sell: MACD histogram crosses zero downward
+        elif i > 0:
+            hist_cross_down = (row["macd_hist"] < 0) and (df.iloc[i - 1]["macd_hist"] >= 0)
+            if hist_cross_down:
+                df.at[df.index[i], "signal"] = -1
 
     return df
 
@@ -66,6 +88,7 @@ def current_signal(df: pd.DataFrame) -> dict:
         "macd_signal": round(last["macd_signal"], 6),
         "macd_hist": round(last["macd_hist"], 6),
         "rsi": round(last["rsi"], 2),
+        "ema100": round(last["ema100"], 6),
         "signal": int(last["signal"]),
         "datetime": last["datetime"],
     }
