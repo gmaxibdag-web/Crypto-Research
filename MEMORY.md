@@ -100,12 +100,29 @@ _Curated knowledge. Updated as we go._
 | SUIUSDT | Bollinger MR | 132 | 24.2% | -$375 | -0.31 |
 | Both | RSI Divergence | ~0 | — | — | — |
 
-### Findings
-- EMA Swing SUI only positive Sharpe strategy — keep live
-- MACD+RSI overtrades (190+ trades) — needs trend filter (EMA100) to cut noise
-- Bollinger MR bleeds in downtrends — needs trend filter too
-- RSI Divergence too restrictive — RSI<35 + price above EMA50 almost never triggers
-- **Next:** tune MACD+RSI + Bollinger with trend filter, run auto-researcher loops
+### Initial Findings (pre-tuning)
+- EMA Swing SUI only positive Sharpe — keep live
+- MACD+RSI overtrades (190 trades) — needs trend filter
+- Bollinger MR bleeds in downtrends — needs trend filter
+- RSI Divergence too restrictive — near-zero signals
+
+### Tuning Results (2026-03-24) — FINAL
+| Strategy | Pair | Trades | P&L | Sharpe | Win% | MaxDD |
+|----------|------|--------|-----|--------|------|-------|
+| RSI Divergence (tuned) 🏆 | XRP | 26 | +$65.84 | 0.47 | 42.3% | -10.2% |
+| EMA Swing | SUI | 40 | +$60 | 0.21 | 37.5% | -16.5% |
+| MACD+RSI (tuned) | SUI | 100 | +$173 | 0.17 | 38.0% | -14.9% |
+| EMA Swing | XRP | 32 | -$7 | -0.04 | 34.4% | -19.3% |
+| Bollinger MR | both | — | negative | negative | — | deep |
+
+### Current Live Config (as of 2026-03-24)
+- **XRPUSDT → rsi_divergence_breakout** (tuned: rsi_oversold=35, vol_mult=1.8, EMA50 ±10% window)
+- **SUIUSDT → ema_swing** (ema_fast=12, ema_slow=26, ema_trend=100, RSI 50-65, vol 1.2x, TP 5%, SL 3%)
+
+### Key Decisions
+- Bollinger MR benched — fundamentally broken in crypto downtrends
+- MACD+RSI SUI (+$173) tempting but Sharpe 0.17 < EMA Swing 0.21 — stay EMA Swing on SUI
+- RSI Divergence XRP wins on quality: fewest trades (26), best Sharpe (0.47), lowest drawdown (-10.2%)
 
 ---
 
