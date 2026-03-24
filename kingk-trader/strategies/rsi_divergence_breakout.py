@@ -36,9 +36,9 @@ def add_indicators(df: pd.DataFrame,
 
 
 def generate_signals(df: pd.DataFrame,
-                     rsi_period: int = 14, rsi_oversold: float = 45, rsi_overbought: float = 65,
+                     rsi_period: int = 14, rsi_oversold: float = 35, rsi_overbought: float = 65,
                      ema_period: int = 50, ema_proximity: float = 0.10,
-                     vol_ma_period: int = 20, vol_mult: float = 1.5) -> pd.DataFrame:
+                     vol_ma_period: int = 20, vol_mult: float = 1.8) -> pd.DataFrame:
     """
     Generate signals for RSI divergence/oversold breakout strategy (v2).
     signal: 1=buy, -1=sell, 0=hold
