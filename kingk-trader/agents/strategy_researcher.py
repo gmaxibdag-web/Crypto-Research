@@ -81,13 +81,56 @@ def log(msg):
     print(f"[{ts}] {msg}", flush=True)
 
 
+def mutate_strategy_with_haiku(baseline_strategy: dict, variation_number: int) -> Optional[dict]:
+    """Use Claude Haiku (cheaper) to generate a parameter mutation."""
+    try:
+        from anthropic import Anthropic
+        api_key = os.getenv("ANTHROPIC_API_KEY")
+        if not api_key:
+            log("  ⚠ No ANTHROPIC_API_KEY — trying Groq instead")
+            return mutate_strategy_with_groq(baseline_strategy, variation_number)
+        
+        client = Anthropic(api_key=api_key)
+        log(f"🧬 Haiku mutation #{variation_number} (cheap)...")
+        
+        response = client.messages.create(
+            model="claude-haiku-4-5",
+            max_tokens=500,
+            messages=[{
+                "role": "user",
+                "content": f"""You are a quantitative trading strategist. Mutate ONE parameter slightly.
+
+BASELINE:
+{json.dumps(baseline_strategy, indent=2)}
+
+Return ONLY valid JSON with mutated strategy (no explanation):
+{{"name": "...", "parameters": {{...}}, "rationale": "..."}}"""
+            }]
+        )
+        
+        raw = response.content[0].text.strip()
+        if "```json" in raw:
+            raw = raw.split("```json")[1].split("```")[0].strip()
+        elif "```" in raw:
+            raw = raw.split("```")[1].split("```")[0].strip()
+        
+        mutated = json.loads(raw)
+        mutated["generation"] = variation_number
+        mutated["source"] = "haiku"
+        log(f"  ✓ {mutated.get('rationale', 'mutation applied')}")
+        return mutated
+    except Exception as e:
+        log(f"  ✗ Haiku error: {e} — falling back to random mutation")
+        return random_mutation(baseline_strategy, variation_number)
+
+
 def mutate_strategy_with_gemini(baseline_strategy: dict, variation_number: int) -> Optional[dict]:
-    """Use Gemini to generate a parameter mutation."""
+    """Use Gemini to generate a parameter mutation (if quota available)."""
     try:
         import google.generativeai as genai
         if not GEMINI_API_KEY:
-            log("  ⚠ No GEMINI_API_KEY — using random mutation fallback")
-            return random_mutation(baseline_strategy, variation_number)
+            log("  ⚠ No GEMINI_API_KEY — trying Haiku instead")
+            return mutate_strategy_with_haiku(baseline_strategy, variation_number)
 
         genai.configure(api_key=GEMINI_API_KEY)
         log(f"🧬 Gemini mutation #{variation_number}...")
@@ -149,6 +192,49 @@ def random_mutation(baseline_strategy: dict, variation_number: int) -> dict:
         "generation": variation_number,
         "source": "random",
     }
+
+
+def mutate_strategy_with_groq(baseline_strategy: dict, variation_number: int) -> Optional[dict]:
+    """Use Groq Llama (cheap, fast) to generate a parameter mutation."""
+    try:
+        from groq import Groq
+        if not GROQ_API_KEY:
+            log("  ⚠ No GROQ_API_KEY — using random mutation fallback")
+            return random_mutation(baseline_strategy, variation_number)
+        
+        client = Groq(api_key=GROQ_API_KEY)
+        log(f"🧬 Groq Llama mutation #{variation_number} (ultra-cheap)...")
+        
+        response = client.chat.completions.create(
+            model="llama-3.1-8b-instant",  # Cheaper than 70b, still solid reasoning
+            messages=[{
+                "role": "user",
+                "content": f"""You are a quantitative trading strategist. Mutate ONE parameter slightly.
+
+BASELINE:
+{json.dumps(baseline_strategy, indent=2)}
+
+Return ONLY valid JSON with mutated strategy (no explanation):
+{{"name": "...", "parameters": {{...}}, "rationale": "..."}}"""
+            }],
+            temperature=0.7,
+            max_tokens=300,
+        )
+        
+        raw = response.choices[0].message.content.strip()
+        if "```json" in raw:
+            raw = raw.split("```json")[1].split("```")[0].strip()
+        elif "```" in raw:
+            raw = raw.split("```")[1].split("```")[0].strip()
+        
+        mutated = json.loads(raw)
+        mutated["generation"] = variation_number
+        mutated["source"] = "groq_llama_8b"
+        log(f"  ✓ {mutated.get('rationale', 'mutation applied')}")
+        return mutated
+    except Exception as e:
+        log(f"  ✗ Groq error: {e} — falling back to random mutation")
+        return random_mutation(baseline_strategy, variation_number)
 
 
 def backtest_strategy(strategy_name: str, parameters: dict,
@@ -284,9 +370,16 @@ def run_research_loop(strategy_name: str, num_cycles: int = 10,
             "parameters": dict(best_params),
         }
 
-        mutated = mutate_strategy_with_gemini(mutation_base, cycle)
+        # Try cheaper models first (Haiku > Groq > Gemini > Random)
+        mutated = None
+        for mutator in [mutate_strategy_with_haiku, mutate_strategy_with_groq, 
+                        mutate_strategy_with_gemini, random_mutation]:
+            mutated = mutator(mutation_base, cycle)
+            if mutated:
+                break
+        
         if not mutated:
-            log("  Skipping (mutation failed)")
+            log("  ✗ All mutation methods failed")
             continue
 
         # Backtest the mutation
