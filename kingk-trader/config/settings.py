@@ -5,8 +5,8 @@ BYBIT_API_SECRET = ""
 BYBIT_TESTNET    = True   # flip to False for live
 
 # --- Trading Mode Configuration ---
-TRADING_MODE = "paper"  # "paper" (simulation) or "testnet" (Bybit demo account)
-TESTNET_ENABLED = False  # SAFETY FLAG: must be True to submit real orders to testnet
+TRADING_MODE = "testnet"  # "paper" (simulation) or "testnet" (Bybit demo account) — TESTNET LIVE 2026-03-24
+TESTNET_ENABLED = True  # SAFETY FLAG: must be True to submit real orders to testnet — ENABLED FOR 2WK FORWARD TEST
 AUTO_CONFIRM_TESTNET = False  # Auto-confirm testnet orders (False = require input)
 
 PAIRS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "SUIUSDT"]
