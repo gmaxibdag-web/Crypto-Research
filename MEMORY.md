@@ -158,9 +158,45 @@ _Curated knowledge. Updated as we go._
 
 ---
 
+## 📈 Expansion to 5 Pairs (2026-03-24 11:32 UTC)
+
+Expanded from 2 pairs to 5:
+- Added BTCUSDT, ETHUSDT, SOLUSDT (2yr 4h data fetched)
+- Backtested both strategies on all 5 pairs
+- **Strategy winners by pair:**
+  | Pair | Strategy | Sharpe | P&L | Trades |
+  |------|----------|--------|-----|--------|
+  | BTCUSDT | funding_rate_divergence | 0.582 | +$43 | 52 |
+  | ETHUSDT | funding_rate_divergence | 0.237 | +$86 | 38 |
+  | SOLUSDT | liquidation_cascade | 0.568 | +$188 | 24 |
+  | XRPUSDT | funding_rate_divergence | 0.520 | +$360 | 50 |
+  | SUIUSDT | liquidation_cascade | 0.843 | +$211 | 34 |
+  
+- **Portfolio totals:** +$888 P&L | 17.8% return | 0.55 avg Sharpe | 145 trades
+- Capital allocation: $1000/pair, $5000 total
+- Both strategies remain active (no benching)
+
+## 🟢 TESTNET DEPLOYMENT (2026-03-24 11:37 UTC)
+
+**Status: LIVE FOR 2-WEEK FORWARD TEST**
+- TRADING_MODE: testnet (Bybit demo account)
+- TESTNET_ENABLED: True
+- AUTO_CONFIRM_TESTNET: true
+- Paper trader runs every 4h via cron
+- All 5 pairs trading with assigned strategies
+- Real fills, real slippage, real order flow (fake money)
+
+**Timeline:** 2-week trial (March 24 — April 7, 2026)
+**Goal:** Compare actual Sharpe vs backtest Sharpe, prove edge holds live
+
+---
+
 ## 📌 Decisions & Lessons
 
 - **4h > 1h for this strategy.** 1h generates too many false EMA crosses. Both pairs negative on 1h.
 - **Don't trust small sample backtests** — 500 bars = 83 days, not enough. Always load full CSV.
 - **Auto-researcher needs backtest integration to work** — mutation loop is useless without it.
 - **Document everything in MEMORY.md** to avoid re-discovering the same issues next session.
+- **Liquidation Cascade dominates volatility** (SOL, SUI high Sharpe) — Funding Rate better on majors (BTC, ETH, XRP)
+- **Test live before scaling capital** — backtests are optimistic; testnet shows reality
+- **Quota tracking essential** — free tier limits real quick; implemented fallback chain (Groq → DeepSeek → Gemini → random)
