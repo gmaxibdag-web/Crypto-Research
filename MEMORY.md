@@ -16,6 +16,8 @@ _Curated knowledge. Updated as we go._
 ## 📁 Project: KingK Trader
 
 **Location:** `/root/.openclaw/workspace/kingk-trader`
+**GitHub:** https://github.com/gmaxibdag-web/Crypto-Research.git (remote: origin, branch: master)
+**Push:** `git push origin master` — token stored in remote URL, classic PAT
 
 ### Architecture
 - `agents/paper_trader.py` — live paper trading loop (runs every 4h via cron)
