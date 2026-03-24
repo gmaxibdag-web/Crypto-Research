@@ -48,6 +48,37 @@ STRATEGY = {
     # SUIUSDT fallback: ema_swing (Sharpe=0.213, P&L=+$60.00)
 }
 
+# ── LIQUIDATION CASCADE (2026-03-24) ─────────────────────────────────────────
+# Signal: OI-derived liquidation spike (top 10%) + red candle + negative funding
+# = long capitulation event → relief bounce
+#
+# XRPUSDT: Sharpe=0.496 | P&L=+$58  | 27 trades | WR=48% | MaxDD=-11.3%
+# SUIUSDT: Sharpe=0.831 | P&L=+$97  | 24 trades | WR=50% | MaxDD=-6.4%
+#
+# VERDICT: Competitive. BEATS funding_rate_divergence on SUI (0.831 vs 0.696 Sharpe).
+# Lower trade count = more selective signal.
+# NOTE: Requires liquidation + funding CSVs:
+#   python3 data/fetch_liquidation_history.py
+#   python3 data/fetch_funding_history.py
+LIQUIDATION_CASCADE_CONFIG = {
+    "XRPUSDT": {
+        "strategy":              "liquidation_cascade",
+        "cluster_pct_threshold": 0.90,      # top 10% liq vol events
+        "funding_threshold":     -0.00005,  # neg funding = bearish over-leverage
+        "use_rsi_filter":        False,
+        "tp":                    0.06,
+        "sl":                    0.03,
+    },
+    "SUIUSDT": {
+        "strategy":              "liquidation_cascade",
+        "cluster_pct_threshold": 0.90,
+        "funding_threshold":     -0.00005,
+        "use_rsi_filter":        False,
+        "tp":                    0.06,
+        "sl":                    0.03,
+    },
+}
+
 # --- MACD+RSI best tuned config (runner-up on SUI: P&L=+$172, Sharpe=0.166) ---
 # Use if SUI strategy needs upgrade:
 # macd_fast=8, macd_slow=17, macd_signal=9, rsi_max=70, ema_trend=100

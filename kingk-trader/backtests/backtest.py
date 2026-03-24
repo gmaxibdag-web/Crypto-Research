@@ -41,6 +41,51 @@ def load_funding_data(symbol: str) -> pd.DataFrame:
     return df.sort_values("datetime").reset_index(drop=True)
 
 
+def load_liquidation_data(symbol: str) -> pd.DataFrame:
+    """Load pre-fetched 4h liquidation volume data for a symbol."""
+    path = DATA_DIR / f"{symbol}_liquidations_4h.csv"
+    if not path.exists():
+        return pd.DataFrame()
+    df = pd.read_csv(path, parse_dates=["datetime"])
+    return df.sort_values("datetime").reset_index(drop=True)
+
+
+def merge_liquidation_data(df: pd.DataFrame, symbol: str) -> pd.DataFrame:
+    """
+    Merge liquidation volume data into OHLCV dataframe.
+    Uses merge_asof (forward-fill) since liquidation data aligns to 4h.
+    """
+    df_liq = load_liquidation_data(symbol)
+    if df_liq.empty:
+        print(f"  ⚠ No liquidation data found for {symbol} — using zeros")
+        df["liquidation_volume_usd"] = 0.0
+        df["is_cluster"]             = 0
+        return df
+
+    liq_cols = [c for c in ["datetime", "liquidation_volume_usd", "is_cluster"] if c in df_liq.columns]
+    df_liq = df_liq[liq_cols].sort_values("datetime")
+
+    merged = pd.merge_asof(
+        df.sort_values("datetime"),
+        df_liq,
+        on="datetime",
+        direction="backward",
+        suffixes=("", "_liq"),
+    )
+
+    if "liquidation_volume_usd" in merged.columns:
+        merged["liquidation_volume_usd"] = merged["liquidation_volume_usd"].ffill().fillna(0.0)
+    else:
+        merged["liquidation_volume_usd"] = 0.0
+
+    if "is_cluster" in merged.columns:
+        merged["is_cluster"] = merged["is_cluster"].ffill().fillna(0).astype(int)
+    else:
+        merged["is_cluster"] = 0
+
+    return merged.sort_values("datetime").reset_index(drop=True)
+
+
 def merge_funding_data(df: pd.DataFrame, symbol: str) -> pd.DataFrame:
     """
     Merge funding rate and open interest into OHLCV dataframe.
@@ -149,6 +194,12 @@ def run_backtest(symbol: str, capital: float = 400, interval: str = "240",
 
     # Auto-merge funding data if strategy needs it
     if "funding" in strategy_name:
+        df = merge_funding_data(df, symbol)
+
+    # Auto-merge liquidation data if strategy needs it
+    if "liquidation" in strategy_name:
+        df = merge_liquidation_data(df, symbol)
+        # Liquidation cascade also needs funding rate data for confluence signal
         df = merge_funding_data(df, symbol)
 
     # Load and apply strategy
