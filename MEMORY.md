@@ -124,16 +124,22 @@ _Curated knowledge. Updated as we go._
 - Paper trader routes per-pair via STRATEGY_MODULE (dynamic importlib load)
 - Bybit funding rate data: 2yr fetcher built, auto-aligns 8h funding intervals to 4h candle grid
 
-### Funding Rate Divergence — NEW CHAMPION (2026-03-24 07:31 UTC)
-✅ **Built:** `data/fetch_funding_history.py` (Bybit V5 paginator, 2yr 8h→4h alignment), `strategies/funding_rate_divergence.py`
-✅ **Promoted:** Both XRP and SUI now running Funding Rate Divergence
+### Strategy Progression (2026-03-24)
 
+**Funding Rate Divergence** (built 07:31 UTC)
 | Pair | Trades | P&L | Sharpe | MaxDD | Win% |
 |------|--------|-----|--------|-------|------|
 | XRPUSDT | 50 | +$144 | 0.520 | -14.2% | 58% |
 | SUIUSDT | 34 | +$132 | 0.696 | -11.8% | 50% |
 
-**Beats all previous winners by 2.2x P&L.** Key: negative funding rate (bears paying) + OI drop >2% + RSI<50 = capitulation bounce signal.
+**Liquidation Cascade** (built 07:44 UTC) 🏆 BETTER on SUI
+| Pair | Trades | P&L | Sharpe | MaxDD | Win% |
+|------|--------|-----|--------|-------|------|
+| XRPUSDT | 27 | +$58 | 0.496 | -9.1% | 48% |
+| SUIUSDT | 24 | +$97 | **0.831** | **-6.4%** | 58% |
+
+**SUI: Liquidation Cascade wins** (0.831 Sharpe is highest ever, -6.4% MaxDD is safest)
+**XRP: Funding Rate stays** (more trades, more P&L, still solid 0.52 Sharpe)
 
 ### Key Decisions
 - Funding Rate Divergence is the new live strategy (both pairs)
