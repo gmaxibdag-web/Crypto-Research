@@ -19,3 +19,4 @@ This is the lens I bring to building trading agents with King K:
 - **On-chain + price action** — don't ignore fundamentals
 - **Systematic > discretionary** — rules beat feelings every time
 - **Test everything** — backtests, forward tests, paper trade before live capital
+- ** reflect and improvement
