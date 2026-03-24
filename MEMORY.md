@@ -117,16 +117,28 @@ _Curated knowledge. Updated as we go._
 | EMA Swing | XRP | 32 | -$7 | -0.04 | 34.4% | -19.3% |
 | Bollinger MR | both | — | negative | negative | — | deep |
 
-### Current Live Config (as of 2026-03-24)
-- **XRPUSDT → rsi_divergence_breakout** (rsi_oversold=35, vol_mult=1.8, ema_proximity=0.10) — Sharpe 0.473, +$65
-- **SUIUSDT → ema_swing** (ema_fast=12, ema_slow=26, ema_trend=100, RSI 50-65, vol 1.2x, TP 5%, SL 3%) — Sharpe 0.21, +$60
-- Paper trader routes per-pair via STRATEGY_MODULE in config/settings.py (importlib dynamic load)
-- ⚠️ Tuned params must live as defaults in the strategy module itself — backtest.py doesn't pass extra params to generate_signals()
+### Current Live Config (as of 2026-03-24 07:31 UTC)
+- **XRPUSDT → funding_rate_divergence** 🏆 (funding<-0.00005, OI drop >2%, RSI<50) — Sharpe **0.520**, **+$144**
+- **SUIUSDT → funding_rate_divergence** 🏆 (same params) — Sharpe **0.696**, **+$132**
+- Previous winners: RSI Divergence XRP (+$66, 0.473), EMA Swing SUI (+$60, 0.213) — both **superseded**
+- Paper trader routes per-pair via STRATEGY_MODULE (dynamic importlib load)
+- Bybit funding rate data: 2yr fetcher built, auto-aligns 8h funding intervals to 4h candle grid
+
+### Funding Rate Divergence — NEW CHAMPION (2026-03-24 07:31 UTC)
+✅ **Built:** `data/fetch_funding_history.py` (Bybit V5 paginator, 2yr 8h→4h alignment), `strategies/funding_rate_divergence.py`
+✅ **Promoted:** Both XRP and SUI now running Funding Rate Divergence
+
+| Pair | Trades | P&L | Sharpe | MaxDD | Win% |
+|------|--------|-----|--------|-------|------|
+| XRPUSDT | 50 | +$144 | 0.520 | -14.2% | 58% |
+| SUIUSDT | 34 | +$132 | 0.696 | -11.8% | 50% |
+
+**Beats all previous winners by 2.2x P&L.** Key: negative funding rate (bears paying) + OI drop >2% + RSI<50 = capitulation bounce signal.
 
 ### Key Decisions
+- Funding Rate Divergence is the new live strategy (both pairs)
 - Bollinger MR benched — fundamentally broken in crypto downtrends
-- MACD+RSI SUI (+$173) tempting but Sharpe 0.17 < EMA Swing 0.21 — stay EMA Swing on SUI
-- RSI Divergence XRP wins on quality: fewest trades (26), best Sharpe (0.47), lowest drawdown (-10.2%)
+- RSI Divergence + EMA Swing remain as backups
 
 ---
 
