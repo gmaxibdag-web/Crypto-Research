@@ -32,6 +32,52 @@ def load_csv(symbol: str, interval: str) -> pd.DataFrame:
     return df.sort_values("datetime").reset_index(drop=True)
 
 
+def load_funding_data(symbol: str) -> pd.DataFrame:
+    """Load pre-fetched 4h funding rate + OI data for a symbol."""
+    path = DATA_DIR / f"{symbol}_funding_4h.csv"
+    if not path.exists():
+        return pd.DataFrame()
+    df = pd.read_csv(path, parse_dates=["datetime"])
+    return df.sort_values("datetime").reset_index(drop=True)
+
+
+def merge_funding_data(df: pd.DataFrame, symbol: str) -> pd.DataFrame:
+    """
+    Merge funding rate and open interest into OHLCV dataframe.
+    Uses merge_asof (forward-fill) since funding updates less frequently.
+    """
+    df_fund = load_funding_data(symbol)
+    if df_fund.empty:
+        print(f"  ⚠ No funding data found for {symbol} — using zeros")
+        df["funding_rate"] = 0.0
+        df["open_interest"] = 0.0
+        return df
+
+    fund_cols = [c for c in ["datetime", "funding_rate", "open_interest"] if c in df_fund.columns]
+    df_fund = df_fund[fund_cols].sort_values("datetime")
+
+    merged = pd.merge_asof(
+        df.sort_values("datetime"),
+        df_fund,
+        on="datetime",
+        direction="backward",
+        suffixes=("", "_fund"),
+    )
+
+    # Forward-fill any gaps (funding doesn't update every 4h candle)
+    if "funding_rate" in merged.columns:
+        merged["funding_rate"] = merged["funding_rate"].ffill().fillna(0.0)
+    else:
+        merged["funding_rate"] = 0.0
+
+    if "open_interest" in merged.columns:
+        merged["open_interest"] = merged["open_interest"].ffill().fillna(0.0)
+    else:
+        merged["open_interest"] = 0.0
+
+    return merged.sort_values("datetime").reset_index(drop=True)
+
+
 # ── Strategy Loader ───────────────────────────────────────────────────────────
 
 def load_strategy_module(strategy_name: str):
@@ -100,6 +146,10 @@ def run_backtest(symbol: str, capital: float = 400, interval: str = "240",
 
     # Load data
     df = load_csv(symbol, interval)
+
+    # Auto-merge funding data if strategy needs it
+    if "funding" in strategy_name:
+        df = merge_funding_data(df, symbol)
 
     # Load and apply strategy
     module = load_strategy_module(strategy_name)
