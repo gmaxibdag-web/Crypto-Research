@@ -6,6 +6,10 @@ State persists in logs/paper_portfolio.json
 Per-pair strategy routing: each symbol uses its configured strategy module
 to generate entry signals via generate_signals(df). Exit logic (TP/SL/EMA
 cross for ema_swing) remains hardcoded here for all pairs.
+
+Supports two modes:
+- paper: pure simulation (default)
+- testnet: submit orders to Bybit testnet demo account
 """
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -16,11 +20,27 @@ from datetime import datetime, timezone
 from pathlib import Path
 from data.fetcher import get_klines, get_ticker
 from agents.failsafe import safe_call
-from config.settings import PAIRS, ALLOCATION, STRATEGY, STRATEGY_MODULE
+from config.settings import PAIRS, ALLOCATION, STRATEGY, STRATEGY_MODULE, TRADING_MODE, TESTNET_ENABLED, AUTO_CONFIRM_TESTNET
 
 PORTFOLIO_FILE = Path(__file__).parent.parent / "logs" / "paper_portfolio.json"
 LOG_FILE       = Path(__file__).parent.parent / "logs" / "paper_trades.log"
 STRATEGIES_DIR = Path(__file__).parent.parent / "strategies"
+
+# Testnet trader (lazy-loaded if needed)
+_testnet_trader = None
+
+def get_testnet_trader():
+    """Lazy-load testnet trader instance."""
+    global _testnet_trader
+    if _testnet_trader is None:
+        from agents.bybit_trader import BybitTestnetTrader
+        api_key = os.getenv("BYBIT_API_KEY")
+        api_secret = os.getenv("BYBIT_API_SECRET")
+        if not api_key or not api_secret:
+            log("❌ ERROR: BYBIT_API_KEY or BYBIT_API_SECRET not set in .env")
+            raise ValueError("Bybit credentials missing")
+        _testnet_trader = BybitTestnetTrader(api_key, api_secret)
+    return _testnet_trader
 
 def now_utc():
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
@@ -98,10 +118,37 @@ def get_signal(symbol: str) -> dict | None:
         "module":       module_name,
     }
 
+def confirm_testnet_order(symbol: str, qty: float, tp: float, sl: float, price: float) -> bool:
+    """
+    Ask user for confirmation before submitting testnet order.
+    Auto-confirm if AUTO_CONFIRM_TESTNET=True.
+    """
+    if AUTO_CONFIRM_TESTNET:
+        return True
+    
+    print(f"\n⚠️  TESTNET MODE — Order about to submit:")
+    print(f"    Symbol: {symbol}")
+    print(f"    Side: BUY")
+    print(f"    Qty: {qty}")
+    print(f"    Entry Price: ${price}")
+    print(f"    TP: ${tp}")
+    print(f"    SL: ${sl}")
+    response = input("Proceed? (y/n): ").strip().lower()
+    return response == "y"
+
 def run_paper_trader():
     p = load_portfolio()
     log("=" * 60)
-    log("📋 KingK Paper Trader")
+    
+    # Log trading mode
+    if TRADING_MODE == "testnet":
+        if TESTNET_ENABLED:
+            log("⚠️  TRADING MODE: TESTNET (orders will be submitted to Bybit demo account)")
+        else:
+            log("❌ TESTNET MODE DISABLED — Set TESTNET_ENABLED=True to trade")
+            log("📋 KingK Paper Trader (TESTNET DISABLED — simulation mode)")
+    else:
+        log("📋 KingK Paper Trader (PAPER MODE — simulation only)")
 
     for symbol in PAIRS:
         data = safe_call("bybit", get_signal, symbol)
@@ -127,6 +174,23 @@ def run_paper_trader():
                 reason    = "TP 🎯" if hit_tp else ("SL 🛑" if hit_sl else "EMA_X")
                 exit_price = pos["tp"] if hit_tp else (pos["sl"] if hit_sl else price)
                 pnl       = (exit_price - pos["entry_price"]) / pos["entry_price"] * alloc
+                
+                # --- TESTNET MODE: Submit real exit order ---
+                if pos.get("mode") == "testnet" and TRADING_MODE == "testnet" and TESTNET_ENABLED:
+                    try:
+                        trader = get_testnet_trader()
+                        result = trader.place_market_sell(symbol, pos["qty"])
+                        
+                        if result["status"] != "Error":
+                            log(f"  {symbol} CLOSED {reason} — TESTNET SELL EXECUTED")
+                            log(f"     Order ID: {result['order_id']}")
+                            log(f"     Est. P&L: ${pnl:+.2f} {'✅' if pnl > 0 else '❌'}")
+                        else:
+                            log(f"  {symbol} ❌ TESTNET EXIT FAILED: {result['error']}")
+                    except Exception as e:
+                        log(f"  {symbol} ❌ TESTNET EXIT ERROR: {str(e)}")
+                
+                # Update portfolio regardless of mode
                 p["cash"] += alloc + pnl
                 p["total_pnl"] += pnl
                 p["closed_trades"].append({
@@ -137,10 +201,16 @@ def run_paper_trader():
                     "exit_time":   now_utc(),
                     "pnl_usd":     round(pnl, 2),
                     "reason":      reason,
+                    "mode":        pos.get("mode", "paper"),
                 })
                 del p["positions"][symbol]
                 emoji = "✅" if pnl > 0 else "❌"
-                log(f"  {symbol} CLOSED {reason} — P&L: ${pnl:+.2f} {emoji}")
+                
+                # Log differently for paper vs testnet
+                if pos.get("mode") == "testnet":
+                    log(f"  {symbol} CLOSED {reason} — P&L: ${pnl:+.2f} {emoji} [TESTNET]")
+                else:
+                    log(f"  {symbol} CLOSED {reason} — P&L: ${pnl:+.2f} {emoji}")
 
         # --- Check entries ---
         if symbol not in p["positions"] and p["cash"] >= alloc:
@@ -149,16 +219,52 @@ def run_paper_trader():
                 tp_price = round(price * (1 + cfg["tp"]), 6)
                 sl_price = round(price * (1 - cfg["sl"]), 6)
                 qty      = round(alloc / price, 4)
-                p["cash"] -= alloc
-                p["positions"][symbol] = {
-                    "qty":         qty,
-                    "entry_price": price,
-                    "tp":          tp_price,
-                    "sl":          sl_price,
-                    "entry_time":  now_utc(),
-                    "strategy":    module_name,
-                }
-                log(f"  {symbol} 🟢 BUY {qty} @ ${price} | TP ${tp_price} | SL ${sl_price} | via {module_name}")
+                
+                # --- TESTNET MODE: Submit real order ---
+                if TRADING_MODE == "testnet" and TESTNET_ENABLED:
+                    log(f"\n⚠️  TESTNET ORDER PENDING CONFIRMATION")
+                    log(f"    Symbol: {symbol} | Qty: {qty} | Price: ${price}")
+                    log(f"    TP: ${tp_price} | SL: ${sl_price}")
+                    
+                    if confirm_testnet_order(symbol, qty, tp_price, sl_price, price):
+                        try:
+                            trader = get_testnet_trader()
+                            result = trader.place_market_buy(symbol, qty, tp_price, sl_price)
+                            
+                            if result["status"] != "Error":
+                                p["cash"] -= alloc
+                                p["positions"][symbol] = {
+                                    "qty":         qty,
+                                    "entry_price": price,
+                                    "tp":          tp_price,
+                                    "sl":          sl_price,
+                                    "entry_time":  now_utc(),
+                                    "strategy":    module_name,
+                                    "order_id":    result["order_id"],
+                                    "mode":        "testnet",
+                                }
+                                log(f"  {symbol} ✅ TESTNET BUY ORDER SUBMITTED")
+                                log(f"     Order ID: {result['order_id']}")
+                                log(f"     Qty: {qty} | Entry: ${price} | TP: ${tp_price} | SL: ${sl_price}")
+                            else:
+                                log(f"  {symbol} ❌ TESTNET ORDER FAILED: {result['error']}")
+                        except Exception as e:
+                            log(f"  {symbol} ❌ TESTNET ERROR: {str(e)}")
+                    else:
+                        log(f"  {symbol} ⚪ TESTNET ORDER CANCELLED BY USER")
+                
+                # --- PAPER MODE: Simulate order ---
+                else:
+                    p["cash"] -= alloc
+                    p["positions"][symbol] = {
+                        "qty":         qty,
+                        "entry_price": price,
+                        "tp":          tp_price,
+                        "sl":          sl_price,
+                        "entry_time":  now_utc(),
+                        "strategy":    module_name,
+                    }
+                    log(f"  {symbol} 🟢 BUY {qty} @ ${price} | TP ${tp_price} | SL ${sl_price} | via {module_name}")
             else:
                 log(f"  {symbol} ⚪ HOLD — signal:{data['entry_signal']} cross_down:{data['cross_down']} | via {module_name}")
 
