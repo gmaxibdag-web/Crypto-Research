@@ -89,6 +89,6 @@ INTERVAL = "240"   # 4h candles
 # --- Per-pair strategy module routing ---
 # Updated 2026-03-24: funding_rate_divergence promoted on both pairs
 STRATEGY_MODULE = {
-    "XRPUSDT": "funding_rate_divergence",  # NEW 2026-03-24 (was: rsi_divergence_breakout)
-    "SUIUSDT": "funding_rate_divergence",  # NEW 2026-03-24 (was: ema_swing)
+    "XRPUSDT": "funding_rate_divergence",  # Sharpe 0.52, +$144 (2026-03-24)
+    "SUIUSDT": "liquidation_cascade",       # Sharpe 0.83, +$97, 6.4% MaxDD — SUPERIOR (2026-03-24)
 }
