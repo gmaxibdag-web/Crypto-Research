@@ -1,0 +1,46 @@
+{
+  "generation": 4,
+  "timestamp": "2026-03-24T06:56:26.579790",
+  "strategy_module": "rsi_divergence_breakout",
+  "strategy": {
+    "name": "RSI Divergence Breakout v4",
+    "parameters": {
+      "rsi_oversold": 35,
+      "rsi_overbought": 65,
+      "vol_mult": 1.8,
+      "ema_period": 50,
+      "ema_proximity": 0.1,
+      "tp": 0.051,
+      "sl": 0.03
+    },
+    "rationale": "Random mutation: tp 0.06 \u2192 0.051",
+    "generation": 4,
+    "source": "random"
+  },
+  "backtest": {
+    "symbol": "XRPUSDT",
+    "interval": "240",
+    "strategy": "rsi_divergence_breakout",
+    "capital": 400,
+    "tp": 0.051,
+    "sl": 0.03,
+    "num_bars": 5000,
+    "num_trades": 105,
+    "total_pnl_usd": -88.68,
+    "total_pnl_pct": -22.17,
+    "win_rate": 0.3333,
+    "sharpe_ratio": -0.0998,
+    "max_drawdown": -0.4304,
+    "avg_win_usd": 16.38,
+    "avg_loss_usd": -9.46,
+    "best_trade_usd": 20.4,
+    "worst_trade_usd": -12.0,
+    "exit_reasons": {
+      "SL": 43,
+      "EXIT_SIGNAL": 40,
+      "TP": 22
+    }
+  },
+  "is_best": false,
+  "lookahead_bias_flag": false
+}

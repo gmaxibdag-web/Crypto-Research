@@ -1,0 +1,9 @@
+{
+  "bybit": {
+    "failures": 0,
+    "open_until": 0,
+    "daily_calls": {
+      "2026-03-24": 5
+    }
+  }
+}

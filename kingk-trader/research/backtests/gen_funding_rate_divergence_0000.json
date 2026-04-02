@@ -1,0 +1,25 @@
+{
+  "generation": 0,
+  "timestamp": "2026-03-24T08:03:10.626365",
+  "strategy_module": "funding_rate_divergence",
+  "strategy": {
+    "name": "Funding Rate Divergence",
+    "parameters": {
+      "funding_threshold": 0.0003,
+      "rsi_min": 40,
+      "rsi_max": 60,
+      "vol_mult": 1.5,
+      "tp": 0.04,
+      "sl": 0.02
+    },
+    "rationale": "Baseline strategy",
+    "generation": 0,
+    "source": "baseline"
+  },
+  "backtest": {
+    "error": "Backtest subprocess failed",
+    "stderr": "Traceback (most recent call last):\n  File \"/root/.openclaw/workspace/kingk-trader/backtests/backtest.py\", line 17, in <module>\n    import pandas as pd\nModuleNotFoundError: No module named 'pandas'\n"
+  },
+  "is_best": true,
+  "lookahead_bias_flag": false
+}
