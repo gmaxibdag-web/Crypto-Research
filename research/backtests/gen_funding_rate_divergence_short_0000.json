@@ -1,0 +1,43 @@
+{
+  "generation": 0,
+  "timestamp": "2026-03-29T04:28:12.478253",
+  "strategy_module": "funding_rate_divergence_short",
+  "strategy": {
+    "name": "Funding Rate Divergence SHORT",
+    "parameters": {
+      "funding_threshold": 5e-05,
+      "oi_increase_pct": 0.02,
+      "tp": 0.06,
+      "sl": 0.03
+    },
+    "rationale": "Baseline strategy",
+    "generation": 0,
+    "source": "baseline"
+  },
+  "backtest": {
+    "symbol": "XRPUSDT",
+    "interval": "240",
+    "strategy": "funding_rate_divergence_short",
+    "capital": 400,
+    "tp": 0.06,
+    "sl": 0.03,
+    "num_bars": 5000,
+    "num_trades": 179,
+    "total_pnl_usd": 208.72,
+    "total_pnl_pct": 52.18,
+    "win_rate": 0.419,
+    "sharpe_ratio": 0.0858,
+    "max_drawdown": -0.2058,
+    "avg_win_usd": 19.11,
+    "avg_loss_usd": -11.77,
+    "best_trade_usd": 24.0,
+    "worst_trade_usd": -12.0,
+    "exit_reasons": {
+      "SL": 102,
+      "TP": 50,
+      "EXIT_SIGNAL": 27
+    }
+  },
+  "is_best": true,
+  "lookahead_bias_flag": false
+}

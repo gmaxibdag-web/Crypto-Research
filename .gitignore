@@ -1,0 +1,8 @@
+.env
+venv/
+__pycache__/
+*.pyc
+*.pyo
+data/*.json
+logs/*.log
+research/raw/

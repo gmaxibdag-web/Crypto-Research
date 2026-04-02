@@ -1,0 +1,242 @@
+[
+  {
+    "pair": "XRPUSDT",
+    "interval": "60",
+    "strategy": "rsi_divergence_breakout",
+    "sharpe": -0.0328,
+    "pnl": -30.07,
+    "trades": 116,
+    "win_rate": 0,
+    "timestamp": "2026-03-29 02:02 UTC"
+  },
+  {
+    "pair": "XRPUSDT",
+    "interval": "240",
+    "strategy": "rsi_divergence_breakout",
+    "sharpe": 0.4735,
+    "pnl": 65.85,
+    "trades": 26,
+    "win_rate": 0,
+    "timestamp": "2026-03-29 02:02 UTC"
+  },
+  {
+    "pair": "SUIUSDT",
+    "interval": "60",
+    "strategy": "rsi_divergence_breakout",
+    "sharpe": -0.108,
+    "pnl": -84.49,
+    "trades": 98,
+    "win_rate": 0,
+    "timestamp": "2026-03-29 02:02 UTC"
+  },
+  {
+    "pair": "SUIUSDT",
+    "interval": "240",
+    "strategy": "rsi_divergence_breakout",
+    "sharpe": 0.1056,
+    "pnl": 6.18,
+    "trades": 15,
+    "win_rate": 0,
+    "timestamp": "2026-03-29 02:02 UTC"
+  },
+  {
+    "pair": "XRPUSDT",
+    "interval": "60",
+    "strategy": "liquidation_cascade",
+    "sharpe": 0.2573,
+    "pnl": 58.7,
+    "trades": 45,
+    "win_rate": 0,
+    "timestamp": "2026-03-29 02:02 UTC"
+  },
+  {
+    "pair": "XRPUSDT",
+    "interval": "240",
+    "strategy": "liquidation_cascade",
+    "sharpe": 0.4956,
+    "pnl": 58.05,
+    "trades": 27,
+    "win_rate": 0,
+    "timestamp": "2026-03-29 02:02 UTC"
+  },
+  {
+    "pair": "SUIUSDT",
+    "interval": "60",
+    "strategy": "liquidation_cascade",
+    "sharpe": 0.7343,
+    "pnl": 211.95,
+    "trades": 45,
+    "win_rate": 0,
+    "timestamp": "2026-03-29 02:02 UTC"
+  },
+  {
+    "pair": "SUIUSDT",
+    "interval": "240",
+    "strategy": "liquidation_cascade",
+    "sharpe": 0.831,
+    "pnl": 96.58,
+    "trades": 24,
+    "win_rate": 0,
+    "timestamp": "2026-03-29 02:02 UTC"
+  },
+  {
+    "pair": "XRPUSDT",
+    "interval": "60",
+    "strategy": "ema_swing",
+    "sharpe": -0.0551,
+    "pnl": -44.79,
+    "trades": 114,
+    "win_rate": 0,
+    "timestamp": "2026-03-29 02:02 UTC"
+  },
+  {
+    "pair": "XRPUSDT",
+    "interval": "240",
+    "strategy": "ema_swing",
+    "sharpe": -0.0401,
+    "pnl": -7.26,
+    "trades": 32,
+    "win_rate": 0,
+    "timestamp": "2026-03-29 02:02 UTC"
+  },
+  {
+    "pair": "SUIUSDT",
+    "interval": "60",
+    "strategy": "ema_swing",
+    "sharpe": -0.0162,
+    "pnl": -31.68,
+    "trades": 166,
+    "win_rate": 0,
+    "timestamp": "2026-03-29 02:02 UTC"
+  },
+  {
+    "pair": "SUIUSDT",
+    "interval": "240",
+    "strategy": "ema_swing",
+    "sharpe": 0.2133,
+    "pnl": 60.0,
+    "trades": 40,
+    "win_rate": 0,
+    "timestamp": "2026-03-29 02:02 UTC"
+  },
+  {
+    "pair": "XRPUSDT",
+    "interval": "60",
+    "strategy": "macd_rsi",
+    "sharpe": 0.0468,
+    "pnl": 135.19,
+    "trades": 281,
+    "win_rate": 0,
+    "timestamp": "2026-03-29 02:02 UTC"
+  },
+  {
+    "pair": "XRPUSDT",
+    "interval": "240",
+    "strategy": "macd_rsi",
+    "sharpe": -0.3073,
+    "pnl": -141.91,
+    "trades": 72,
+    "win_rate": 0,
+    "timestamp": "2026-03-29 02:02 UTC"
+  },
+  {
+    "pair": "SUIUSDT",
+    "interval": "60",
+    "strategy": "macd_rsi",
+    "sharpe": 0.0736,
+    "pnl": 292.37,
+    "trades": 285,
+    "win_rate": 0,
+    "timestamp": "2026-03-29 02:02 UTC"
+  },
+  {
+    "pair": "SUIUSDT",
+    "interval": "240",
+    "strategy": "macd_rsi",
+    "sharpe": 0.0348,
+    "pnl": 24.9,
+    "trades": 79,
+    "win_rate": 0,
+    "timestamp": "2026-03-29 02:02 UTC"
+  },
+  {
+    "pair": "XRPUSDT",
+    "interval": "60",
+    "strategy": "funding_rate_divergence",
+    "sharpe": 0.3787,
+    "pnl": 81.66,
+    "trades": 40,
+    "win_rate": 0,
+    "timestamp": "2026-03-29 02:02 UTC"
+  },
+  {
+    "pair": "XRPUSDT",
+    "interval": "240",
+    "strategy": "funding_rate_divergence",
+    "sharpe": 0.5199,
+    "pnl": 144.23,
+    "trades": 50,
+    "win_rate": 0,
+    "timestamp": "2026-03-29 02:02 UTC"
+  },
+  {
+    "pair": "SUIUSDT",
+    "interval": "60",
+    "strategy": "funding_rate_divergence",
+    "sharpe": 0.7855,
+    "pnl": 128.29,
+    "trades": 31,
+    "win_rate": 0,
+    "timestamp": "2026-03-29 02:02 UTC"
+  },
+  {
+    "pair": "SUIUSDT",
+    "interval": "240",
+    "strategy": "funding_rate_divergence",
+    "sharpe": 0.6956,
+    "pnl": 132.01,
+    "trades": 34,
+    "win_rate": 0,
+    "timestamp": "2026-03-29 02:02 UTC"
+  },
+  {
+    "pair": "XRPUSDT",
+    "interval": "60",
+    "strategy": "bollinger_mean_reversion",
+    "sharpe": -0.0063,
+    "pnl": -15.72,
+    "trades": 256,
+    "win_rate": 0,
+    "timestamp": "2026-03-29 02:02 UTC"
+  },
+  {
+    "pair": "XRPUSDT",
+    "interval": "240",
+    "strategy": "bollinger_mean_reversion",
+    "sharpe": -0.793,
+    "pnl": -190.21,
+    "trades": 47,
+    "win_rate": 0,
+    "timestamp": "2026-03-29 02:02 UTC"
+  },
+  {
+    "pair": "SUIUSDT",
+    "interval": "60",
+    "strategy": "bollinger_mean_reversion",
+    "sharpe": -0.0462,
+    "pnl": -85.51,
+    "trades": 194,
+    "win_rate": 0,
+    "timestamp": "2026-03-29 02:02 UTC"
+  },
+  {
+    "pair": "SUIUSDT",
+    "interval": "240",
+    "strategy": "bollinger_mean_reversion",
+    "sharpe": -1.6812,
+    "pnl": -277.12,
+    "trades": 37,
+    "win_rate": 0,
+    "timestamp": "2026-03-29 02:02 UTC"
+  }
+]

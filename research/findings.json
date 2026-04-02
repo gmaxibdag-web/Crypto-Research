@@ -1,0 +1,299 @@
+[
+  {
+    "topic": "RSI divergence volume breakout crypto momentum",
+    "summary": "The research suggests that RSI divergence can be a useful indicator for identifying potential breakouts in cryptocurrency markets, particularly when combined with volume analysis. However, the effectiveness of this strategy can be influenced by various market and trading factors. The studies provide insights into the behavior of cryptocurrencies and the importance of considering multiple factors when developing a trading strategy.",
+    "edge_exists": true,
+    "confidence": "medium",
+    "key_findings": [
+      "RSI divergence can be a predictive signal for breakouts in cryptocurrency markets",
+      "Volume analysis can help confirm the strength of a potential breakout",
+      "Combining RSI divergence with other indicators, such as liquidity measures, can improve the accuracy of trading signals"
+    ],
+    "signal_parameters": {
+      "primary_indicator": "RSI",
+      "optimal_timeframe": "4h",
+      "entry_conditions": [
+        "RSI divergence",
+        "increasing volume"
+      ],
+      "confirmation_signals": [
+        "breakout above resistance",
+        "liquidity jump"
+      ],
+      "risk_notes": "high volatility and potential for false breakouts"
+    },
+    "implementation_notes": "Implementing this strategy in a paper trader would require setting up a trading bot to monitor RSI divergence and volume analysis, and executing trades based on the defined entry and confirmation conditions.",
+    "backtesting_suggestions": "Backtest the strategy using historical data, varying the timeframe and parameters to optimize performance, and considering different risk management techniques to mitigate potential losses.",
+    "papers_cited": [
+      "Cryptocurrency Trading: A Comprehensive Survey",
+      "Exploring the Interconnectedness of Cryptocurrencies using Correlation Networks",
+      "Rise of the Machines? Intraday High-Frequency Trading Patterns of Cryptocurrencies",
+      "Liquidity Jump, Liquidity Diffusion, and Crypto Wash Trading",
+      "Dynamic Grid Trading Strategy: From Zero Expectation to Market Outperformance"
+    ],
+    "model_used": "llama-3.3-70b-versatile",
+    "papers_found": 8,
+    "researched_at": "2026-03-22T23:41:14.545854"
+  },
+  {
+    "topic": "SUI on-chain momentum trading signals altcoin",
+    "summary": "Research suggests that on-chain momentum trading signals can be used to predict price movements in altcoins, including SUI. The use of machine learning algorithms and dynamic grid trading strategies can improve the accuracy of these predictions. However, the effectiveness of these signals depends on various factors, including market conditions and the quality of the data used.",
+    "edge_exists": true,
+    "confidence": "medium",
+    "key_findings": [
+      "On-chain momentum signals, such as transaction volume and network activity, have predictive value for altcoin price movements",
+      "Machine learning algorithms, such as LSTM and Random Forest, can be used to improve the accuracy of these predictions",
+      "Dynamic grid trading strategies can be used to adapt to changing market conditions and improve trading performance"
+    ],
+    "signal_parameters": {
+      "primary_indicator": "On-chain momentum indicator (e.g. transaction volume, network activity)",
+      "optimal_timeframe": "4h",
+      "entry_conditions": [
+        "Bullish on-chain momentum signal",
+        "Price above moving average"
+      ],
+      "confirmation_signals": [
+        "Bullish RSI divergence",
+        "Increasing trading volume"
+      ],
+      "risk_notes": "High market volatility and potential for false signals"
+    },
+    "implementation_notes": "Implement a paper trader using a programming language such as Python, with libraries such as CCXT for data feed and backtesting, and scikit-learn for machine learning algorithms",
+    "backtesting_suggestions": "Backtest the strategy using historical data, with a focus on evaluating the performance of the on-chain momentum indicator and the dynamic grid trading strategy, and adjusting parameters as needed",
+    "papers_cited": [
+      "151 Estrategias de Trading (151 Trading Strategies)",
+      "AI for trading strategies",
+      "Dynamic Grid Trading Strategy: From Zero Expectation to Market Outperformance",
+      "Ensemble properties of high frequency data and intraday trading rules",
+      "Backtest of Trading Systems on Candle Charts"
+    ],
+    "model_used": "llama-3.3-70b-versatile",
+    "papers_found": 8,
+    "researched_at": "2026-03-22T23:41:31.154810"
+  },
+  {
+    "topic": "EMA crossover trend following crypto momentum edge",
+    "summary": "Research suggests that EMA crossover strategies can be effective in identifying trends and generating trading signals in cryptocurrency markets, with some studies showing significant returns and risk-adjusted performance. The EMA crossover strategy involves buying when a short-term EMA crosses above a long-term EMA and selling when it crosses below. This approach can be used to capture momentum and follow trends in crypto markets.",
+    "edge_exists": true,
+    "confidence": "medium",
+    "key_findings": [
+      "The EMA crossover strategy can be used to identify trends and generate trading signals in cryptocurrency markets",
+      "Short-term EMAs (e.g. 12-day) crossing above long-term EMAs (e.g. 50-day) can be a bullish signal, while crosses below can be bearish",
+      "The optimal timeframe for EMA crossover strategies in crypto markets is not universally agreed upon, but common timeframes include 4h, 1d, and 1w"
+    ],
+    "signal_parameters": {
+      "primary_indicator": "EMA crossover",
+      "optimal_timeframe": "1d",
+      "entry_conditions": [
+        "short EMA crosses above long EMA",
+        "short EMA crosses below long EMA"
+      ],
+      "confirmation_signals": [
+        "RSI",
+        "MACD"
+      ],
+      "risk_notes": "high volatility and potential for whipsaws in trending markets"
+    },
+    "implementation_notes": "Implement the EMA crossover strategy using a paper trader or backtesting platform, with careful consideration of position sizing, risk management, and market conditions",
+    "backtesting_suggestions": "Test the EMA crossover strategy using historical data, varying the timeframe, EMA periods, and other parameters to optimize performance and robustness",
+    "papers_cited": [
+      "Cryptocurrency Trading: A Comprehensive Survey",
+      "A Decade of Evidence of Trend Following Investing in Cryptocurrencies",
+      "Rise of the Machines? Intraday High-Frequency Trading Patterns of Cryptocurrencies",
+      "Multi-EMA Crossover Trend Following Quantitative Trading Strategy",
+      "How to trade EMA 12 / 50 crossovers? Crypto strategy - altFINS"
+    ],
+    "model_used": "llama-3.3-70b-versatile",
+    "papers_found": 15,
+    "researched_at": "2026-03-22T23:56:24.801725"
+  },
+  {
+    "topic": "funding rate divergence reversal crypto trading edge",
+    "summary": "Research suggests that funding rate divergence can be a predictive signal for crypto price reversals, with studies indicating its effectiveness in 2024-2025. The strategy exploits funding rate differences between exchanges, creating opportunities for informed participants. By tracking funding dynamics alongside technical analysis, traders can spot turning points and refine trading strategies.",
+    "edge_exists": true,
+    "confidence": "medium",
+    "key_findings": [
+      "Funding rate divergence can predict crypto price reversals",
+      "Negative funding combined with a sharp drop in open interest is a reliable signal of bull capitulation",
+      "Rising open interest alongside falling price and funding indicates sellers are in control"
+    ],
+    "signal_parameters": {
+      "primary_indicator": "Funding Rate Divergence",
+      "optimal_timeframe": "4h-1d",
+      "entry_conditions": [
+        "Negative funding rate",
+        "Sharp drop in open interest",
+        "Funding rate divergence between exchanges"
+      ],
+      "confirmation_signals": [
+        "Technical analysis indicators",
+        "Open interest trends"
+      ],
+      "risk_notes": "High market volatility and liquidity risks"
+    },
+    "implementation_notes": "Implement a trading strategy that monitors funding rate divergence between exchanges, using technical analysis to confirm entry and exit signals. Consider using a grid trading strategy to adapt to market conditions.",
+    "backtesting_suggestions": "Backtest the strategy using historical data from 2020-2025, evaluating its performance during different market phases and volatility levels. Compare the results to a buy-and-hold strategy and other trading strategies.",
+    "papers_cited": [
+      "151 Estrategias de Trading (151 Trading Strategies)",
+      "Dynamic Grid Trading Strategy: From Zero Expectation to Market Outperformance",
+      "AI for trading strategies",
+      "Ensemble properties of high frequency data and intraday trading rules",
+      "Backtest of Trading Systems on Candle Charts",
+      "Web synthesis: funding rate divergence reversal crypto trading edge",
+      "How Funding Rates Predict Crypto's Most Violent Reversals",
+      "The funding rate: how it helps anticipate price reversals in ...",
+      "Funding Rate Arbitrage: The 200% APY Strategy Nobody ..."
+    ],
+    "model_used": "llama-3.3-70b-versatile",
+    "papers_found": 15,
+    "researched_at": "2026-03-23T02:30:14.392264"
+  },
+  {
+    "topic": "liquidation cascade network effect crypto momentum",
+    "summary": "Research suggests that liquidation cascades in crypto markets can trigger significant market shifts, and momentum trading strategies can capitalize on sustained trends. The network effect and leverage can amplify market moves, and liquidations can serve as leading indicators of market vulnerability. Institutional traders can use this information to build positions and anticipate volatile market moves.",
+    "edge_exists": true,
+    "confidence": "medium",
+    "key_findings": [
+      "Liquidation cascades can trigger significant market shifts and momentum trading strategies can capitalize on sustained trends",
+      "The network effect and leverage can amplify market moves, and liquidations can serve as leading indicators of market vulnerability",
+      "Institutional traders can use liquidation data to anticipate volatile market moves and build positions"
+    ],
+    "signal_parameters": {
+      "primary_indicator": "Liquidation cascade indicator",
+      "optimal_timeframe": "4h",
+      "entry_conditions": [
+        "Cluster of liquidations around a specific price level",
+        "Price re-approaches the liquidation threshold"
+      ],
+      "confirmation_signals": [
+        "Time-series momentum indicator",
+        "Cross-sectional momentum indicator"
+      ],
+      "risk_notes": "High leverage and market volatility can increase risk of significant losses"
+    },
+    "implementation_notes": "Implement a paper trader to test the liquidation cascade indicator and momentum trading strategy, using a 4h timeframe and entry conditions based on liquidation clusters and price re-approach",
+    "backtesting_suggestions": "Backtest the strategy using historical data, varying the timeframe and entry conditions to optimize performance, and evaluate the effectiveness of the confirmation signals",
+    "papers_cited": [
+      "Liquidity Jump, Liquidity Diffusion, and Crypto Wash Trading",
+      "Exploring the Interconnectedness of Cryptocurrencies using Correlation Networks",
+      "Cryptocurrency Trading: A Comprehensive Survey",
+      "Pairwise and high-order dependencies in the cryptocurrency trading network",
+      "Liquidity Jump, Liquidity Diffusion, and Treatment on Wash Trading of Crypto Assets",
+      "Momentum and liquidity in cryptocurrencies",
+      "Liquidations in Crypto: How to Anticipate Volatile Market Moves"
+    ],
+    "model_used": "llama-3.3-70b-versatile",
+    "papers_found": 15,
+    "researched_at": "2026-03-23T02:30:25.871974"
+  },
+  {
+    "topic": "MACD histogram divergence trend confirmation crypto signals",
+    "summary": "The research suggests that MACD histogram divergence can be used to confirm trend reversals in crypto trading, and combining MACD with other indicators like RSI can improve accuracy. MACD signals are best used for trend confirmation and early reversal warnings. The MACD line crossing above or below the signal line, and the histogram shifting from negative to positive or vice versa, are key signals used by traders.",
+    "edge_exists": true,
+    "confidence": "medium",
+    "key_findings": [
+      "MACD histogram divergence can confirm trend reversals in crypto trading",
+      "Combining MACD with RSI can improve accuracy",
+      "MACD line crossing above or below the signal line is a key signal"
+    ],
+    "signal_parameters": {
+      "primary_indicator": "MACD",
+      "optimal_timeframe": "4h, 1d",
+      "entry_conditions": [
+        "MACD line crosses above signal line",
+        "RSI is under 70"
+      ],
+      "confirmation_signals": [
+        "RSI",
+        "volume"
+      ],
+      "risk_notes": "false positives can occur in high volatility markets"
+    },
+    "implementation_notes": "Implement MACD indicator in a paper trader, using a 4h or 1d timeframe, and combine with RSI and volume for confirmation",
+    "backtesting_suggestions": "Backtest the strategy using historical data, varying the timeframe and parameters to optimize performance",
+    "papers_cited": [
+      "Cryptocurrency Trading: A Comprehensive Survey",
+      "Optimizing MACD Trading Strategies A Dance of Finance, Wavelets, and Genetics",
+      "A comparative study of the MACD-base trading strategies: evidence from the US stock market",
+      "MACD Indicator in Crypto Trading Explained",
+      "5 MACD Strategies for Crypto Trading - Stockio.ai"
+    ],
+    "model_used": "llama-3.3-70b-versatile",
+    "papers_found": 15,
+    "researched_at": "2026-03-23T02:30:38.252939"
+  },
+  {
+    "topic": "Bollinger Bands mean reversion volatility compression crypto",
+    "summary": "The research suggests that Bollinger Bands can be used to identify mean reversion opportunities in cryptocurrency markets, particularly during periods of low volatility. The strategy involves entering a trade when the price touches or moves beyond an outer band, with the expectation that it will revert back to the average. This approach has been shown to be effective in crypto markets for short-term profit opportunities.",
+    "edge_exists": true,
+    "confidence": "medium",
+    "key_findings": [
+      "Bollinger Bands can be used to identify oversold/overbought conditions in cryptocurrency markets",
+      "The 20-period moving average is a commonly used benchmark for mean reversion strategies",
+      "Volatility compression can be a useful indicator of potential mean reversion opportunities"
+    ],
+    "signal_parameters": {
+      "primary_indicator": "Bollinger Bands",
+      "optimal_timeframe": "4h",
+      "entry_conditions": [
+        "price touches or moves beyond an outer band",
+        "volatility is low"
+      ],
+      "confirmation_signals": [
+        "price reversal",
+        "increasing trading volume"
+      ],
+      "risk_notes": "high volatility and market unpredictability can lead to false signals"
+    },
+    "implementation_notes": "Implement the Bollinger Bands indicator with a 20-period moving average and 2 standard deviations for the outer bands. Use a paper trader to test the strategy and adjust parameters as needed.",
+    "backtesting_suggestions": "Test the strategy on historical data using different timeframes and parameters to evaluate its effectiveness. Compare the results to a buy-and-hold approach to determine if the strategy provides a significant edge.",
+    "papers_cited": [
+      "Neural Augmented Kalman Filtering with Bollinger Bands for Pairs Trading",
+      "Cryptocurrency Trading: A Comprehensive Survey",
+      "Bollinger Bands Thirty Years Later",
+      "Exploring the Interconnectedness of Cryptocurrencies using Correlation Networks",
+      "Beyond Trading Data: The Hidden Influence of Public Awareness and Interest on Cryptocurrency Volatility"
+    ],
+    "model_used": "llama-3.3-70b-versatile",
+    "papers_found": 15,
+    "researched_at": "2026-03-23T02:30:52.267177"
+  },
+  {
+    "topic": "order book imbalance micro-structure market microstructure prediction",
+    "summary": "Research suggests that order book imbalance has predictive value for short-term price movements in crypto markets, with high-frequency trading strategies exploiting these imbalances for profit. Market microstructure analysis reveals the dynamics of liquidity and price discovery, with order flow imbalance being a key factor in price formation and volatility. The use of order book imbalance as a predictor of near-term price movements is supported by various studies, including those that document stable cross-asset patterns in cryptocurrency limit-order-book microstructure.",
+    "edge_exists": true,
+    "confidence": "high",
+    "key_findings": [
+      "Order book imbalance predicts short-term price movements in crypto markets",
+      "High-frequency trading strategies can exploit these imbalances for profit",
+      "Order flow imbalance is a key factor in price formation and volatility"
+    ],
+    "signal_parameters": {
+      "primary_indicator": "Order Book Imbalance (OBI)",
+      "optimal_timeframe": "1m-1h",
+      "entry_conditions": [
+        "OBI > 0.5",
+        "Price deviation from mid-price > 1%"
+      ],
+      "confirmation_signals": [
+        "Increasing buy/sell order volume",
+        "Trend confirmation from moving averages"
+      ],
+      "risk_notes": "High market volatility and sudden changes in market sentiment can affect the accuracy of OBI signals"
+    },
+    "implementation_notes": "Implement a real-time order book data feed to calculate OBI and use a programming language like Python to backtest and execute trades based on the signal parameters",
+    "backtesting_suggestions": "Test the strategy on historical data using a walk-forward optimization approach, evaluating performance metrics such as profit/loss ratio, Sharpe ratio, and maximum drawdown",
+    "papers_cited": [
+      "Limit Order Book Dynamics in Matching Markets: Microstructure, Spread, and Execution Slippage",
+      "Market Impact in a Latent Order Book",
+      "Algorithmic trading in a microstructural limit order book model",
+      "Trade arrival dynamics and quote imbalance in a limit order book",
+      "Uncertainty relations in models of market microstructure",
+      "Explainable Patterns in Cryptocurrency Microstructure",
+      "Impact of order book asymmetries on cryptocurrency prices"
+    ],
+    "model_used": "llama-3.3-70b-versatile",
+    "papers_found": 15,
+    "researched_at": "2026-03-23T02:31:03.138803"
+  }
+]

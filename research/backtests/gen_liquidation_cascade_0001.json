@@ -1,0 +1,43 @@
+{
+  "generation": 1,
+  "timestamp": "2026-03-24T08:08:05.217908",
+  "strategy_module": "liquidation_cascade",
+  "strategy": {
+    "name": "Strategy name with variation #1",
+    "parameters": {
+      "cluster_pct_threshold": 0.99,
+      "funding_threshold": -5e-05,
+      "tp": 0.066,
+      "sl": 0.03
+    },
+    "rationale": "Raised cluster_pct_threshold by 10% to increase sensitivity",
+    "generation": 1,
+    "source": "groq_llama_8b"
+  },
+  "backtest": {
+    "symbol": "XRPUSDT",
+    "interval": "240",
+    "strategy": "liquidation_cascade",
+    "capital": 400,
+    "tp": 0.066,
+    "sl": 0.03,
+    "num_bars": 5000,
+    "num_trades": 27,
+    "total_pnl_usd": 54.38,
+    "total_pnl_pct": 13.59,
+    "win_rate": 0.4815,
+    "sharpe_ratio": 0.4623,
+    "max_drawdown": -0.114,
+    "avg_win_usd": 13.25,
+    "avg_loss_usd": -8.42,
+    "best_trade_usd": 26.4,
+    "worst_trade_usd": -12.0,
+    "exit_reasons": {
+      "EXIT_SIGNAL": 16,
+      "SL": 7,
+      "TP": 4
+    }
+  },
+  "is_best": false,
+  "lookahead_bias_flag": false
+}
